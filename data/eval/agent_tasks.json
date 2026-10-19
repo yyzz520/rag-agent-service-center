@@ -1,0 +1,26 @@
+[
+  {
+    "question": "清源缓释片有哪些规格？",
+    "expect_tools": ["search_knowledge_base"],
+    "expect_answer_contains": "30mg"
+  },
+  {
+    "question": "冷藏库的温度要求是多少？",
+    "expect_tools": ["search_knowledge_base"],
+    "expect_answer_contains": "2~8"
+  },
+  {
+    "question": "请用计算器算一下 17*23 等于多少",
+    "expect_tools": ["calculator"],
+    "expect_answer_contains": "391"
+  },
+  {
+    "question": "召回按风险分几级、一级召回要在多长时间内通知到位？另外帮我算一下 17*23。",
+    "expect_tools": ["search_knowledge_base", "calculator"],
+    "expect_answer_contains": "391"
+  },
+  {
+    "question": "你好，用一句话介绍你自己就行。",
+    "forbid_tools": true
+  }
+]

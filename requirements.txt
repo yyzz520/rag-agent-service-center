@@ -1,0 +1,42 @@
+# 依赖已按当前验证通过的版本精确锁定（==），保证可复现。
+# 变更依赖：改这里后重装并重跑 6.8/评测基线确认无回归；升级时统一 bump，勿只改一处。
+
+# AI 框架
+langchain-core==1.6.0
+langchain-community==0.4.2
+langchain-openai==1.6.0
+langchain-text-splitters==1.1.2
+langchain-chroma==1.1.0
+chromadb==1.5.9
+langgraph==1.2.11
+langgraph-prebuilt==1.1.0        # create_react_agent
+langgraph-checkpoint-sqlite==3.1.1    # 本地零依赖档：会话记忆落 sqlite
+langgraph-checkpoint-postgres==3.1.2  # 多实例档：会话记忆落 Postgres（官方无 MySQL saver）
+rank-bm25==0.2.2
+
+# MCP：把外部 MCP server 的工具载入 agent（adapter 0.3.2 约束 mcp<2.0）
+langchain-mcp-adapters==0.3.2
+mcp==1.30.0
+
+# Web
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-multipart==0.0.32
+
+# 配置
+pydantic==2.13.4
+pydantic-settings==2.15.0
+python-dotenv==1.2.3
+httpx==0.28.1
+
+# 存储 / 鉴权 / 异步
+sqlalchemy==2.0.52
+psycopg[binary]==3.3.5           # Postgres 驱动（SQLAlchemy + checkpointer 共用）
+pyjwt==2.13.0
+aiosqlite==0.22.1                # AsyncSqliteSaver 流式会话持久化
+redis==8.1.0                     # 跨进程限流 + 检索缓存
+
+# 文档解析
+pypdf==6.16.2
+python-docx==1.2.0               # .docx Word 解析
+openpyxl==3.1.5                  # .xlsx Excel 解析

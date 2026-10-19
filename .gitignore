@@ -1,0 +1,12 @@
+.env
+# data/ 下是运行时产物（库、向量、trace、报告），只放行评测数据集，保证 clone 后能复跑评测
+data/*
+!data/eval/
+data/eval/*
+!data/eval/golden.json
+!data/eval/agent_tasks.json
+uploads/
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/

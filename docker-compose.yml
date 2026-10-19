@@ -1,0 +1,106 @@
+services:
+  app:
+    build:
+      context: .
+      args:
+        # 国内默认走腾讯 PyPI 镜像（本机实测最快）；别处可 export PIP_INDEX_URL=... 覆盖
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://mirrors.cloud.tencent.com/pypi/simple}
+    # 不设 container_name：设了就没法 --scale app=N（容器名会撞）。对外端口交给 nginx。
+    # 不 publish 端口：多副本时每个副本抢同一个宿主端口必然失败，用 expose 只在集群内可达。
+    expose:
+      - "8200"
+    env_file: .env
+    # 容器内用服务名连 postgres/redis：覆盖 .env 里的 127.0.0.1:5433/6380（那是宿主机开发的地址）
+    environment:
+      DB_URL: postgresql+psycopg://rag:rag@postgres:5432/rag
+      CHECKPOINT_BACKEND: postgres
+      POSTGRES_DSN: postgresql://rag:rag@postgres:5432/rag
+      REDIS_URL: redis://redis:6379/0
+      CHROMA_HOST: chroma
+      CHROMA_PORT: "8000"
+      # 反代后面：限流按 XFF 首跳分桶，不这样做所有客户端会挤进反代那一个桶
+      TRUST_PROXY: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      chroma:
+        condition: service_healthy
+    mem_limit: 2g
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+        reservations:
+          memory: 512m
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+
+  # 多副本入口。宿主机映射到 8201（8200 留给宿主机直接跑 uvicorn 的开发方式，两者不打架）。
+  # 扩容：docker compose up -d --scale app=3
+  nginx:
+    image: docker.m.daocloud.io/library/nginx:alpine
+    container_name: rag-agent-nginx
+    ports:
+      - "8201:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  # 仅启 infra：docker compose up -d postgres redis chroma（app 在宿主机用 uvicorn 跑）
+  postgres:
+    image: docker.m.daocloud.io/library/postgres:16-alpine
+    container_name: rag-agent-postgres
+    environment:
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: rag
+      POSTGRES_DB: rag
+    ports:
+      - "5433:5432"          # 避开宿主已有的 5432/5455
+    volumes:
+      - ./data/pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag -d rag"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: valkey/valkey:8
+    container_name: rag-agent-redis
+    command: ["valkey-server", "--save", "60", "1"]   # 每 60s 有 1 次写就落盘
+    ports:
+      - "6380:6379"          # 避开宿主已有的 6379
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # 独立向量库服务：装了它才能 --scale app=N（嵌入式 Chroma 是进程内独占文件，副本间共享不了）
+  chroma:
+    image: docker.m.daocloud.io/chromadb/chroma:1.5.9   # 必须与 pip 里 chromadb 客户端同代，协议不兼容
+    container_name: rag-agent-chroma
+    ports:
+      - "8001:8000"          # 宿主机开发连 127.0.0.1:8001；容器内走服务名 chroma:8000
+    environment:
+      IS_PERSISTENT: "TRUE"      # 落盘到 /data，重启不丢
+      ANONYMIZED_TELEMETRY: "FALSE"
+    volumes:
+      - ./data/chroma-server:/data
+    # 镜像里没有 curl/wget/python，只能用 bash 的 /dev/tcp 手搓一个 HTTP 探测
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8000 && printf 'GET /api/v2/heartbeat HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && cat <&3 | head -1 | grep -q '200'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped

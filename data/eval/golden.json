@@ -1,0 +1,87 @@
+[
+  {
+    "question": "清源缓释片有哪些规格？",
+    "expect_source": "清源缓释片说明书.pdf",
+    "expect_contains": "30mg 与 60mg 两种缓释片规格"
+  },
+  {
+    "question": "清源缓释片该怎么服用？可以掰开吗？",
+    "expect_source": "清源缓释片说明书.pdf",
+    "expect_contains": "必须整片吞服"
+  },
+  {
+    "question": "生产中的偏差按影响程度分成哪几级？",
+    "expect_source": "GMP偏差处理管理规程.md",
+    "expect_contains": "微小偏差（Minor）"
+  },
+  {
+    "question": "发现关键偏差后要在多长时间内上报质量部？",
+    "expect_source": "GMP偏差处理管理规程.md",
+    "expect_contains": "24 小时内完成书面偏差记录"
+  },
+  {
+    "question": "关键物料供应商多久开展一次现场质量审计？",
+    "expect_source": "供应商质量审计管理规程.pdf",
+    "expect_contains": "每年至少开展一次现场质量审计"
+  },
+  {
+    "question": "首次合作的新供应商在供货前需要满足什么条件？",
+    "expect_source": "供应商质量审计管理规程.pdf",
+    "expect_contains": "合作前必须完成一次质量审计"
+  },
+  {
+    "question": "冷藏库的温度要求是多少？",
+    "expect_source": "仓储温控与效期管理SOP.pdf",
+    "expect_contains": "冷藏区 2~8°C"
+  },
+  {
+    "question": "发现冷藏库断电或超温报警后要多快响应？",
+    "expect_source": "仓储温控与效期管理SOP.pdf",
+    "expect_contains": "仓储人员须在 1 小时内响应并上报质量部"
+  },
+  {
+    "question": "近效期产品是怎么管理的？",
+    "expect_source": "仓储温控与效期管理SOP.pdf",
+    "expect_contains": "效期不足 6 个月的产品划入近效期专区存放"
+  },
+  {
+    "question": "获知死亡或危及生命的不良反应后应在多长时间内报告？",
+    "expect_source": "药物警戒与不良反应报告制度.txt",
+    "expect_contains": "7 日内提交初步报告"
+  },
+  {
+    "question": "CTD 注册资料的模块三主要放什么内容？",
+    "expect_source": "药品注册申报资料要求CTD.md",
+    "expect_contains": "原料药与制剂的组成、生产工艺、质量标准"
+  },
+  {
+    "question": "产品召回按风险分几级？一级召回要在多长时间内通知到位？",
+    "expect_source": "清源缓释片召回管理规程.docx",
+    "expect_contains": "须在启动后 24 小时内通知到各级经销商与医疗机构"
+  },
+  {
+    "question": "召回结束后多少天内要完成召回效果评价？",
+    "expect_source": "清源缓释片召回管理规程.docx",
+    "expect_contains": "召回结束后 5 个工作日内完成召回效果评价"
+  },
+  {
+    "question": "批次 QS-2024-1118C 的清源缓释片现在怎么处置？",
+    "expect_source": "近效期预警批次清单.xlsx",
+    "expect_contains": "QS-2024-1118C"
+  },
+  {
+    "question": "批次 QS-2025-0812F 的清源缓释片出厂检验结论是什么？能否放行？",
+    "expect_source": "清源缓释片出厂检验报告扫描件.pdf",
+    "expect_contains": "准予放行"
+  },
+  {
+    "question": "出厂检验报告里溶出度规定的限度范围是多少？",
+    "expect_source": "清源缓释片出厂检验报告扫描件.pdf",
+    "expect_contains": "溶出度：限度为标示量的"
+  },
+  {
+    "question": "清源缓释片出厂检验对含量测定规定的限度范围是多少（占标示量百分比）？",
+    "expect_source": "清源缓释片出厂检验报告扫描件.pdf",
+    "expect_contains": "含量测定：限度为标示量的"
+  }
+]

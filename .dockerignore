@@ -1,0 +1,7 @@
+.venv
+data
+uploads
+.git
+__pycache__
+.env
+*.md
