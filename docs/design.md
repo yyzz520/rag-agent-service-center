@@ -2,9 +2,9 @@
 
 [← 返回 README](../README.md)
 
-## 为什么生产档只有 Postgres、不是 MySQL
+## 为什么生产形态只有 Postgres、不是 MySQL
 
-会话记忆用的是 LangGraph 官方 checkpointer，**官方只出 sqlite / postgres 两个后端，没有 MySQL saver**。所以生产档选 Postgres，让会话记忆和应用表统一到一个引擎——少一套中间件、能共用连接配置与备份策略。
+会话记忆用的是 LangGraph 官方 checkpointer，**官方只出 sqlite / postgres 两个后端，没有 MySQL saver**。所以生产形态选 Postgres，让会话记忆和应用表统一到一个引擎——少一套中间件、能共用连接配置与备份策略。
 
 ## 分布式组件怎么起作用
 

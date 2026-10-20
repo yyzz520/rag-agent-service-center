@@ -17,7 +17,7 @@
 
 一个以文档为业务对象的 AI 服务：上传文档后，既能做带引用的 RAG 问答，也能让 LangGraph 智能体自主调工具完成任务。
 
-项目重点不在"能跑起来"，而在**生产环境真实会遇到的几件事**——多租户隔离、会话持久化、多副本一致性、评测可复现。所以它有两档部署（零依赖 / 生产栈），并且明确列出**没做和做不了的边界**。
+项目重点不在"能跑起来"，而在**生产环境真实会遇到的几件事**——多租户隔离、会话持久化、多副本一致性、评测可复现。所以它有两档部署（零依赖 / 生产形态），并且明确列出**没做和做不了的边界**。
 
 | 能力 | 说明 |
 |---|---|
@@ -73,7 +73,7 @@ python3 -m venv .venv
 
 **零依赖档**：不启任何中间件，元数据走 SQLite、向量走嵌入式 Chroma、限流在进程内——看功能足够。
 
-**生产栈**：`docker compose up -d postgres redis chroma`，把 `.env` 指过去即可；**多副本**：`docker compose up -d --build --scale app=3`，入口在 `http://localhost:8201`。细节见 [部署与多副本](docs/deployment.md)。
+**Docker 完整部署**：`cp .env.example .env` 填好 key 后 `docker compose up -d --build`，入口在 `http://localhost:8201`；多副本加 `--scale app=3`。这套 compose 是在单机复现生产拓扑，不是生产编排方案。从零部署、验证、服务器改动与排错见 [部署与多副本](docs/deployment.md)。
 
 ## 演示动线
 
