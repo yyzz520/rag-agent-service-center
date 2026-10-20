@@ -28,6 +28,16 @@
 | **评测** | RAG 检索评测（recall@k / MRR，零 LLM 花费）+ agent 行为评测（真跑 LLM） |
 | **可观测** | 每问落 trace，带 token / 工具调用 / 步数记账 |
 
+## 界面
+
+Swagger 全量接口一览（nginx 入口 `:8201`，后面是两个 app 副本）：
+
+![Swagger 接口一览](docs/images/swagger.jpeg)
+
+RAG 问答：答案带 `[n]` 引用，`sources` 给出编号对应的原文片段：
+
+![RAG 问答](docs/images/rag-chat.jpeg)
+
 ## 架构
 
 ```mermaid
