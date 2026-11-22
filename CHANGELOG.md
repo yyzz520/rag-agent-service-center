@@ -11,6 +11,8 @@
 - 逐阶段 trace span（parse / retrieval / generation / tool / agent.run）与 Prometheus `/metrics`。
 - 规则化 badcase 诊断 `/api/v1/eval/diagnosis` 与 `make eval-gate` 评测门禁。
 - Agent 评测扩到 8 条（含负样本/禁工具），增加拒答率与禁工具调用率。
+- 检索评测增加 precision@k / NDCG@k；生成评测增加引用正确率（`citation_correct_rate`）。
+- `make export-finetune` 把通过评测的样本导出为 instruction/input/output JSONL。
 - Docker 非 root 运行。
 
 ### Changed

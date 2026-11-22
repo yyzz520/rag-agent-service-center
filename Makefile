@@ -1,6 +1,6 @@
 PYTHON ?= .venv/bin/python
 
-.PHONY: venv install install-dev test lint verify eval-gate run
+.PHONY: venv install install-dev test lint verify eval-gate export-finetune run
 
 .venv:
 	python3 -m venv .venv
@@ -23,6 +23,9 @@ verify: lint test
 
 eval-gate:
 	$(PYTHON) scripts/eval_gate.py
+
+export-finetune:
+	$(PYTHON) scripts/export_finetune.py
 
 run:
 	DB_URL='sqlite:///data/app.db' \

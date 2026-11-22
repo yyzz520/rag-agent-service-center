@@ -89,12 +89,22 @@ def _run_item(item: dict) -> dict:
             "answer": "",
             "sources": 0,
             "cited": False,
+            "cited_ids": [],
+            "citation_correct": False,
             "correct": False,
             "reason": f"生成失败: {exc}",
             "judge_error": False,
         }
 
-    cited = bool(re.search(r"\[\d+\]", answer)) and bool(sources)
+    cited_ids = sorted({int(n) for n in re.findall(r"\[(\d+)\]", answer)})
+    cited_sources = [s for s in sources if s.get("id") in cited_ids]
+    cited = bool(cited_ids) and bool(sources)
+    expect_source = item.get("expect_source") or ""
+    citation_correct = (
+        bool(cited_sources)
+        and bool(expect_source)
+        and any(expect_source in (s.get("source") or "") for s in cited_sources)
+    )
     if category == "negative":
         refused = any(marker in answer for marker in REFUSAL_MARKERS)
         correct = refused and not cited
@@ -105,6 +115,8 @@ def _run_item(item: dict) -> dict:
             "answer": answer[:2000],
             "sources": len(sources),
             "cited": cited,
+            "cited_ids": cited_ids,
+            "citation_correct": False,
             "correct": correct,
             "reason": reason,
             "judge_error": False,
@@ -117,6 +129,8 @@ def _run_item(item: dict) -> dict:
         "answer": answer[:2000],
         "sources": len(sources),
         "cited": cited,
+        "cited_ids": cited_ids,
+        "citation_correct": citation_correct,
         "correct": bool(judged.get("correct")),
         "reason": judged.get("reason", ""),
         "judge_error": bool(judged.get("error")),
@@ -134,6 +148,15 @@ def _metrics(results: list[dict]) -> dict:
         "positive_correct": sum(1 for r in positive if r["correct"]),
         "correct_rate": round(sum(1 for r in positive if r["correct"]) / len(positive), 3) if positive else 0.0,
         "citation_rate": round(sum(1 for r in positive if r["cited"]) / len(positive), 3) if positive else 0.0,
+        "citation_correct_rate": round(
+            sum(1 for r in positive if r.get("citation_correct")) / len(positive), 3
+        ) if positive else 0.0,
+        "citation_wrong_rate": round(
+            sum(1 for r in positive if r.get("cited") and not r.get("citation_correct")) / len(positive), 3
+        ) if positive else 0.0,
+        "citation_missing_rate": round(
+            sum(1 for r in positive if not r.get("cited")) / len(positive), 3
+        ) if positive else 0.0,
         "negative_total": len(negative),
         "negative_refused": clean_refused,
         "refusal_rate": round(clean_refused / len(negative), 3) if negative else 0.0,

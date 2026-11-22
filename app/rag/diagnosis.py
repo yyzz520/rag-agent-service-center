@@ -16,6 +16,8 @@ _SUGGESTIONS = {
     "generation_incorrect_uncited": "答案既不对也没引用：先查是否真的召回，再看生成与引用约束。",
     "refusal_failed": "负样本没拒答：检查系统提示词和检索无命中时的兜底话术。",
     "refusal_citation": "拒答了但仍带引用：拒答分支应禁止输出 [n] 引用。",
+    "citation_wrong": "答案对但引用指向错误来源：检查 [n] 编号映射和 sources 返回。",
+    "citation_missing": "答案对但没有引用：检查生成提示词是否强制标 [n]。",
     "judge_error": "裁判调用失败：评测本身的问题，先修 judge，不要当成模型效果差。",
     "agent_routing": "Agent 工具路由不对：检查工具描述、expect_tools 和提示词。",
     "agent_completion": "Agent 答案不达标：检查工具返回、上下文和最终回答约束。",
@@ -61,6 +63,13 @@ def diagnose_generation(items: list[dict]) -> list[dict]:
             _add(out, "generation", category, question, {
                 "cited": item.get("cited"),
                 "reason": item.get("reason"),
+            })
+        elif not item.get("cited"):
+            _add(out, "generation", "citation_missing", question, {"cited": item.get("cited")})
+        elif not item.get("citation_correct"):
+            _add(out, "generation", "citation_wrong", question, {
+                "cited_ids": item.get("cited_ids"),
+                "citation_correct": item.get("citation_correct"),
             })
     return out
 

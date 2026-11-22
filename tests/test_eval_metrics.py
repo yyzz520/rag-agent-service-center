@@ -14,6 +14,8 @@ def test_metrics_overall_and_by_category():
     assert m["recall@5"] == 0.667
     assert m["recall@16"] == 0.667
     assert m["mrr"] == round((1 + 1 / 3) / 3, 3)
+    assert m["precision@16"] == round(2 / (3 * 16), 3)
+    assert m["ndcg@16"] == 0.5
     assert m["by_category"]["single_doc"]["total"] == 2
     assert m["by_category"]["single_doc"]["recall@1"] == 0.5
     assert m["by_category"]["table"]["recall@1"] == 0.0

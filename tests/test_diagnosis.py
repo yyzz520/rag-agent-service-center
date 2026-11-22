@@ -17,6 +17,8 @@ def test_diagnose_generation_refusal_and_generation():
     items = [
         {"category": "positive", "question": "p1", "correct": False, "cited": True, "judge_error": False},
         {"category": "positive", "question": "p2", "correct": False, "cited": False, "judge_error": True},
+        {"category": "positive", "question": "p3", "correct": True, "cited": True, "citation_correct": False, "judge_error": False},
+        {"category": "positive", "question": "p4", "correct": True, "cited": False, "judge_error": False},
         {"category": "negative", "question": "n1", "reason": "refused_but_cited"},
         {"category": "negative", "question": "n2", "reason": "not_refused"},
     ]
@@ -24,6 +26,8 @@ def test_diagnose_generation_refusal_and_generation():
     categories = [x["category"] for x in out]
     assert "generation_incorrect_cited" in categories
     assert "judge_error" in categories
+    assert "citation_wrong" in categories
+    assert "citation_missing" in categories
     assert "refusal_citation" in categories
     assert "refusal_failed" in categories
 

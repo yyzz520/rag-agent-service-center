@@ -15,6 +15,7 @@ per_query_top / max_docs / use_rerank），Swagger 上不用改代码就能"同�
 每次运行把实际生效的参数快照 + 逐题结果 + 指标追加到 reports.jsonl。
 """
 import json
+import math
 import time
 from pathlib import Path
 
@@ -95,6 +96,12 @@ def _metrics_for(results: list[dict], k: int) -> dict:
     if k >= 5:
         metrics["recall@5"] = round(rank_leq(5) / total, 3) if total else 0.0
     metrics["mrr"] = round(sum(1.0 / r["rank"] for r in hits) / total, 3) if total else 0.0
+    # 每题只有一个期望块：precision@k = 命中数/(题数*k)，NDCG@k = 平均 1/log2(rank+1)。
+    metrics[f"precision@{k}"] = round(rank_leq(k) / (total * k), 3) if total else 0.0
+    metrics[f"ndcg@{k}"] = round(
+        sum(1.0 / math.log2(r["rank"] + 1) for r in results if r["hit"] and r["rank"] <= k) / total,
+        3,
+    ) if total else 0.0
     metrics["hits"] = len(hits)
     metrics["total"] = total
     return metrics
