@@ -7,13 +7,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException, RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.agent.graph import init_checkpointer
 from app.agent.mcp_tools import get_mcp_tools
 from app.api.responses import ok
 from app.api.v1 import agent, auth, docs, eval as eval_api, kb, rag, sessions
 from app.config import settings
+from app.core.metrics import record_request, render_prometheus
 from app.db import init_db
 from app.limiter import limiter
 from app.rag.vector_store import count_chunks
@@ -149,6 +150,13 @@ async def access_log(request: Request, call_next):
             "status": response.status_code if response else 500,
             "ms": ms,
         }, ensure_ascii=False))
+        if request.url.path not in ("/metrics", "/health"):
+            record_request(
+                request.method,
+                request.url.path,
+                response.status_code if response else 500,
+                ms / 1000,
+            )
         if response is not None:
             response.headers["X-Trace-Id"] = trace_id
 
@@ -170,6 +178,14 @@ def health():
         "api_key_ready": bool(settings.siliconflow_api_key),
         "auth_enabled": settings.auth_enabled,
     })
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    """Prometheus 文本格式指标。内网抓取，不做鉴权；生产可放反代后面限制来源。"""
+    return PlainTextResponse(
+        render_prometheus(), media_type="text/plain; version=0.0.4; charset=utf-8"
+    )
 
 
 if __name__ == "__main__":

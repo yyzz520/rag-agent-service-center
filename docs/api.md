@@ -30,6 +30,7 @@
 | GET | /api/v1/eval/agent | agent 行为评测历史报告（逐轮对比路由正确率/完成率/平均步数/平均 token） |
 | GET | /api/v1/eval/summary | 三层评测最新指标汇总 |
 | GET | /health | 健康检查：chunks / auth_enabled / api_key_ready |
+| GET | /metrics | Prometheus 文本指标：请求计数、延迟 sum/count、uptime（内网抓取） |
 
 ## SSE 事件格式
 

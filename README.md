@@ -27,7 +27,7 @@
 | **多租户** | 分块打 `doc_id/user_id/kb_id`，检索按本人文档在 Chroma / BM25 双路收窄 |
 | **多副本** | 限流 / 会话记忆 / 向量库 / 缓存全部外置，`--scale app=N` 后请求落到任何副本都正确 |
 | **评测** | RAG 检索评测（recall@k / MRR，零 LLM 花费）+ agent 行为评测（真跑 LLM） |
-| **可观测** | 每问落 trace，带 token / 工具调用 / 步数记账 |
+| **可观测** | 每问落 trace，带 token / 工具调用 / 步数记账；`GET /metrics` 暴露 Prometheus 请求计数/延迟/uptime |
 
 ## 界面
 
