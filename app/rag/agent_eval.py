@@ -45,6 +45,41 @@ def _text(msg) -> str:
     return content if isinstance(content, str) else str(content)
 
 
+def _tool_call_dict(call) -> dict:
+    if isinstance(call, dict):
+        return {"id": call.get("id"), "name": call.get("name"), "args": call.get("args")}
+    return {
+        "id": getattr(call, "id", None),
+        "name": getattr(call, "name", None),
+        "args": getattr(call, "args", None),
+    }
+
+
+def _serialize_messages(messages: list) -> list[dict]:
+    """把 LangGraph 消息序列化成 messages + tool_calls 轨迹（工具结果截断 2000 字）。"""
+    out: list[dict] = []
+    for msg in messages:
+        msg_type = getattr(msg, "type", "")
+        if msg_type == "human":
+            out.append({"role": "user", "content": _text(msg)})
+        elif msg_type == "ai":
+            item = {"role": "assistant", "content": _text(msg)}
+            calls = getattr(msg, "tool_calls", None) or []
+            if calls:
+                item["tool_calls"] = [_tool_call_dict(c) for c in calls]
+            out.append(item)
+        elif msg_type == "tool":
+            out.append({
+                "role": "tool",
+                "tool_call_id": getattr(msg, "tool_call_id", ""),
+                "name": getattr(msg, "name", ""),
+                "content": _text(msg)[:2000],
+            })
+        elif msg_type == "system":
+            out.append({"role": "system", "content": _text(msg)})
+    return out
+
+
 def _run_task(task: dict) -> dict:
     """跑一条任务：全新 thread_id（不污染真实会话），返回工具路由与答案是否达标。"""
     question = task["question"]
@@ -92,6 +127,7 @@ def _run_task(task: dict) -> dict:
         "negative": bool(task.get("negative")),
         "refused": any(marker in answer for marker in _REFUSAL_MARKERS),
         "cited": bool(re.search(r"\[\d+\]", answer)),
+        "trajectory": _serialize_messages(messages),
     }
 
 

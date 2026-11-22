@@ -42,7 +42,8 @@
 
 - 数据集：`data/eval/agent_tasks.json`。
 - 真跑 LLM，评工具路由正确率、完成率、平均步数、平均 token、负样本拒答率、禁工具调用率。
-- 实测：路由 1.0、完成率 1.0、平均 0.88 步、约 3074 token；负样本 3/3 拒答，禁工具任务 0 调用。
+- 实测：路由 1.0、完成率 0.875、平均 0.88 步、约 3073 token；负样本 2/3 干净拒答，禁工具任务 0 调用。
+- 这轮评测抓到 1 条完成失败、1 条负样本未拒答——评测也会暴露问题，不是只报好消息。
 
 ## 4. Badcase 诊断
 
@@ -92,9 +93,11 @@ GET  /api/v1/eval/diagnosis     # 最近一次评测的规则化 badcase 归因
 - 正样本：`correct=True` 且 `citation_correct=True`；
 - 负样本：干净拒答（`reason=refused`）。
 
-输出 `data/eval/finetune.jsonl`，格式 `{"instruction","input","output"}`，去掉答案里的 `[n]` 引用标记。
+输出：
+- `data/eval/finetune.jsonl`：RAG 答案样本，格式 `{"instruction","input","output"}`，去掉答案里的 `[n]` 引用标记；
+- `data/eval/agent_finetune.jsonl`：Agent 轨迹，格式 `{"messages": [...]}`，包含 user / assistant（含 `tool_calls`）/ tool 消息；只导成功且路由正确的任务。
 
-边界：这是 demo 级回流；生产上要人工复核、去重、隐私脱敏、版本化。不要把模型自己的回答无条件回灌，否则会放大错误。
+边界：这是 demo 级回流；生产上要人工复核、去重、隐私脱敏、版本化。不要把模型自己的回答无条件回灌，否则会放大错误。Agent 轨迹里的工具结果已截断到 2000 字。
 
 ## 口径与边界
 
