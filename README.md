@@ -23,7 +23,7 @@
 | 能力 | 说明 |
 |---|---|
 | **检索** | 查询改写 → 向量 + BM25 混合 → RRF 融合 → Rerank 精排 → 带 `[n]` 引用作答 |
-| **智能体** | LangGraph ReAct：工具调用、多轮记忆（checkpointer）、超长会话自动压缩 |
+| **Agent Harness** | LangGraph ReAct：工具注册、checkpointer 记忆、步数闸/工具防重/超时、MCP 外部工具；能力边界见 [Harness 层](docs/harness.md) |
 | **多租户** | 分块打 `doc_id/user_id/kb_id`，检索按本人文档在 Chroma / BM25 双路收窄 |
 | **多副本** | 限流 / 会话记忆 / 向量库 / 缓存全部外置，`--scale app=N` 后请求落到任何副本都正确 |
 | **评测** | RAG 检索评测（recall@k / MRR，零 LLM 花费）+ agent 行为评测（真跑 LLM） |
@@ -60,6 +60,8 @@ flowchart TD
 - **Agent 链路**：LangGraph ReAct 状态机，LLM 决策 → 调工具（知识库检索 / 计算器 / 外部 MCP 工具）→ 再决策 → 输出；`thread_id=会话ID` 走 checkpointer，**服务重启后旧会话记忆仍在**
 - **长会话压缩**：历史超过阈值（默认 16 条）时，下一轮把更早对话折成摘要、只留最近 8 条原文，上下文不无限增长
 - **多格式解析**：`.txt/.md/.pdf/.docx/.xlsx`，Office/PDF 均带 MIME 内容嗅探；无文字层的扫描/图像 PDF 自动走 MinerU Cloud OCR
+
+**Harness 边界**：这是最小生产级 harness——循环/工具/记忆/护栏/可观测/评测/多副本都有；不含沙箱、子智能体路由、Skills 市场、HITL。完整能力矩阵、扩展点和生产级判断标准见 [Harness 层](docs/harness.md)。
 
 ## 快速开始
 
@@ -131,6 +133,7 @@ make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
 - [部署与多副本（两档部署、鉴权、数据说明、踩坑）](docs/deployment.md)
 - [设计与取舍（分布式组件、已知边界）](docs/design.md)
 - [评测说明（三层评测、指标口径、已知边界）](docs/evaluation.md)
+- [Agent Harness 层（能力矩阵、扩展点、生产级判断标准）](docs/harness.md)
 - [架构决策记录（RRF / 存储 / 多副本）](docs/adr/)
 - [变更记录](CHANGELOG.md) · [贡献指南](CONTRIBUTING.md)
 
