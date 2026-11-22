@@ -44,13 +44,21 @@ def check(
     return failures
 
 
-def main() -> int:
-    baseline = DEFAULT_BASELINE
-    if BASELINE_PATH.exists():
-        baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+def main(
+    retrieval_path: Path | None = None,
+    generation_path: Path | None = None,
+    baseline_path: Path | None = None,
+) -> int:
+    retrieval_path = retrieval_path or RETRIEVAL_PATH
+    generation_path = generation_path or GENERATION_PATH
+    baseline_path = baseline_path or BASELINE_PATH
 
-    retrieval = read_latest(RETRIEVAL_PATH)
-    generation = read_latest(GENERATION_PATH)
+    baseline = DEFAULT_BASELINE
+    if baseline_path.exists():
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+
+    retrieval = read_latest(retrieval_path)
+    generation = read_latest(generation_path)
     retrieval_metrics = retrieval.get("metrics") or {}
     generation_metrics = generation.get("metrics") or {}
 

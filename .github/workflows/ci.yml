@@ -20,3 +20,5 @@ jobs:
         run: ruff check app tests
       - name: Test
         run: pytest -q
+      - name: Eval gate (fixture)
+        run: python scripts/eval_gate.py --retrieval tests/fixtures/eval_reports.jsonl --generation tests/fixtures/gen_reports.jsonl

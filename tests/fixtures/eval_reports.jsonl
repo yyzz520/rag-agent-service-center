@@ -1,0 +1,1 @@
+{"note":"ci-fixture","params":{"max_docs":16,"use_rerank":true},"metrics":{"recall@16":1.0,"recall@1":0.9,"recall@5":1.0,"mrr":0.9,"total":61,"hits":61}}
