@@ -1,6 +1,6 @@
 [project]
 name = "rag-agent-service-center"
-version = "0.4.7"
+version = "0.4.8"
 description = "Enterprise AI middle platform: RAG + Agent service center, evaluation and governance"
 requires-python = ">=3.11"
 
