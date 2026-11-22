@@ -6,6 +6,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![LangGraph](https://img.shields.io/badge/LangGraph-ReAct-1C3C3C)
 ![License MIT](https://img.shields.io/badge/License-MIT-blue)
+![CI](https://github.com/yyzz520/rag-agent-service-center/actions/workflows/ci.yml/badge.svg)
 
 `FastAPI` · `LangChain / LangGraph` · `Chroma` · `Postgres` · `Redis` · `SiliconFlow`
 
@@ -120,6 +121,7 @@ python3 -m venv .venv
 - [部署与多副本（两档部署、鉴权、数据说明、踩坑）](docs/deployment.md)
 - [设计与取舍（分布式组件、已知边界）](docs/design.md)
 - [评测说明（三层评测、指标口径、已知边界）](docs/evaluation.md)
+- [架构决策记录（RRF / 存储 / 多副本）](docs/adr/)
 
 ## License
 

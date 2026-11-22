@@ -48,7 +48,7 @@ def _load_scanned_pdf(path: Path) -> list[Document]:
 
     if not settings.mineru_api_key.strip():
         raise ValueError(
-            f"文件为扫描/图像 PDF（无文字层），需在 .env 配置 MINERU_API_KEY"
+            "文件为扫描/图像 PDF（无文字层），需在 .env 配置 MINERU_API_KEY"
             "（MinerU Cloud OCR）后才能识别；未配置已跳过"
         )
     from app.services.mineru import ocr_pdf_to_text
