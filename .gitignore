@@ -4,6 +4,7 @@ data/*
 !data/eval/
 data/eval/*
 !data/eval/golden.json
+!data/eval/golden_generation.json
 !data/eval/agent_tasks.json
 uploads/
 __pycache__/

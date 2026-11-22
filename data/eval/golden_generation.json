@@ -1,0 +1,94 @@
+[
+  {
+    "question": "清源缓释片有哪些规格？",
+    "expected_answer": "30mg 和 60mg 两种缓释片规格",
+    "category": "positive"
+  },
+  {
+    "question": "清源缓释片的常规用法用量是什么？",
+    "expected_answer": "口服，一日一次，一次 30mg；血压控制不理想时经医师评估可调整至一次 60mg；必须整片吞服，不得咀嚼、压碎或掰开",
+    "category": "positive"
+  },
+  {
+    "question": "哪些患者禁用清源缓释片？",
+    "expected_answer": "对 YSX-01 或任一辅料过敏者禁用；重度肝功能不全者禁用",
+    "category": "positive"
+  },
+  {
+    "question": "生产中的偏差按影响程度分成哪几级？",
+    "expected_answer": "分为微小偏差（Minor）、重大偏差（Major）、关键偏差（Critical）三级",
+    "category": "positive"
+  },
+  {
+    "question": "发现关键偏差后要怎么上报质量部？",
+    "expected_answer": "发现后 2 小时内口头报质量部，并在 24 小时内完成书面偏差记录",
+    "category": "positive"
+  },
+  {
+    "question": "关键物料供应商的现场质量审计频次是多少？",
+    "expected_answer": "关键物料供应商每年至少开展一次现场质量审计；一般物料供应商每两年至少开展一次质量审计",
+    "category": "positive"
+  },
+  {
+    "question": "冷藏库的温度和报警要求是什么？",
+    "expected_answer": "冷藏区温度要求 2~8°C，连续监测，超限报警",
+    "category": "positive"
+  },
+  {
+    "question": "近效期产品是怎么管理的？",
+    "expected_answer": "效期不足 6 个月的产品划入近效期专区存放，并优先发放",
+    "category": "positive"
+  },
+  {
+    "question": "获知死亡或危及生命的不良反应后，报告时限是多少？",
+    "expected_answer": "获知后 7 日内提交初步报告，并自获知起 15 日内提交完整的严重不良反应报告",
+    "category": "positive"
+  },
+  {
+    "question": "CTD 注册资料的模块三主要放什么内容？",
+    "expected_answer": "模块三放药学资料，含原料药与制剂的组成、生产工艺、质量标准、分析方法等",
+    "category": "positive"
+  },
+  {
+    "question": "产品召回分几级，各级通知时限是多少？",
+    "expected_answer": "一级召回启动后 24 小时内通知，二级 48 小时内通知，三级 72 小时内通知",
+    "category": "positive"
+  },
+  {
+    "question": "批次 QS-2024-1118C 的清源缓释片现在怎么处置？",
+    "expected_answer": "该批次进入近效期专区存放，优先发放",
+    "category": "positive"
+  },
+  {
+    "question": "清源缓释片治疗糖尿病的最佳剂量是多少？",
+    "category": "negative"
+  },
+  {
+    "question": "清源生物 2025 年的净利润是多少？",
+    "category": "negative"
+  },
+  {
+    "question": "原料药 YSX-01 的 CAS 登记号是多少？",
+    "category": "negative"
+  },
+  {
+    "question": "仓储部经理的姓名和手机号是多少？",
+    "category": "negative"
+  },
+  {
+    "question": "清源缓释片在欧盟的上市许可编号是多少？",
+    "category": "negative"
+  },
+  {
+    "question": "公司的 GMP 证书有效期到哪一天？",
+    "category": "negative"
+  },
+  {
+    "question": "清源缓释片的儿童推荐剂量是多少？",
+    "category": "negative"
+  },
+  {
+    "question": "近效期清单里批次 QS-2022-0001 的剩余效期是多久？",
+    "category": "negative"
+  }
+]

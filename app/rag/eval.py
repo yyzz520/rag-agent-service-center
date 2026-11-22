@@ -63,37 +63,54 @@ def _replay(item: dict, retriever: RAGRetriever) -> dict:
     docs = retriever.invoke(item["question"])
     expect_source = item["expect_source"]
     expect_contains = item["expect_contains"]
+    category = item.get("category", "uncategorized")
     for rank, d in enumerate(docs, start=1):
         source = d.metadata.get("source") or ""
         if expect_source in source and expect_contains in d.page_content:
             return {
                 "question": item["question"],
+                "category": category,
                 "expect": f"{expect_source}｜{expect_contains}",
                 "hit": True,
                 "rank": rank,
             }
     return {
         "question": item["question"],
+        "category": category,
         "expect": f"{expect_source}｜{expect_contains}",
         "hit": False,
         "rank": None,
     }
 
 
-def _metrics(results: list[dict], k: int) -> dict:
-    """把逐题结果聚合成指标。k = 本次 max_docs（recall@{k} 的衡量线跟着当前参数走）。"""
+def _metrics_for(results: list[dict], k: int) -> dict:
+    """单组指标的聚合（总体或某一分类）。"""
     total = len(results)
     hits = [r for r in results if r["hit"]]
     rank_leq = lambda t: sum(1 for r in results if r["hit"] and r["rank"] <= t)
 
-    metrics = {f"recall@{k}": round(rank_leq(k) / total, 3)}
+    metrics = {f"recall@{k}": round(rank_leq(k) / total, 3) if total else 0.0}
     if k != 1:
-        metrics["recall@1"] = round(rank_leq(1) / total, 3)
+        metrics["recall@1"] = round(rank_leq(1) / total, 3) if total else 0.0
     if k >= 5:
-        metrics["recall@5"] = round(rank_leq(5) / total, 3)
-    metrics["mrr"] = round(sum(1.0 / r["rank"] for r in hits) / total, 3)
+        metrics["recall@5"] = round(rank_leq(5) / total, 3) if total else 0.0
+    metrics["mrr"] = round(sum(1.0 / r["rank"] for r in hits) / total, 3) if total else 0.0
     metrics["hits"] = len(hits)
     metrics["total"] = total
+    return metrics
+
+
+def _metrics(results: list[dict], k: int) -> dict:
+    """把逐题结果聚合成指标。k = 本次 max_docs（recall@{k} 的衡量线跟着当前参数走）。
+
+    同时按 category 分组输出，便于看单文档、表格、扫描件等不同题型的差异。
+    """
+    metrics = _metrics_for(results, k)
+    by_category = {}
+    for category in sorted({r.get("category", "uncategorized") for r in results}):
+        subset = [r for r in results if r.get("category", "uncategorized") == category]
+        by_category[category] = _metrics_for(subset, k)
+    metrics["by_category"] = by_category
     return metrics
 
 

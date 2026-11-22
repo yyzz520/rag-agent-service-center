@@ -15,6 +15,7 @@ from app.rag.chain import get_backup_llm, make_answer_chain, retrieve_context, r
 logger = logging.getLogger("app.api.rag")
 from app.rag.agent_eval import read_agent_reports, run_agent_eval
 from app.rag.eval import read_reports, run_eval
+from app.rag.gen_eval import read_gen_reports, run_gen_eval
 from app.rag.trace import begin_trace, current_usage, end_trace, log_answer, read_trace
 from app.rag.vector_store import get_vectorstore
 from app.services.access import owned_doc, owned_doc_ids
@@ -38,6 +39,10 @@ class EvalRequest(BaseModel):
 
 
 class AgentEvalRequest(BaseModel):
+    note: str | None = Field(default=None, description="给这次运行打个标签，便于和历史里的其他运行区分")
+
+
+class GenEvalRequest(BaseModel):
     note: str | None = Field(default=None, description="给这次运行打个标签，便于和历史里的其他运行区分")
 
 
@@ -230,6 +235,31 @@ def run_agent_eval_now(
         return error(40001, str(e))
     except Exception as e:
         return error(50001, f"agent 评测失败：{e}", status=500)
+    return ok(report)
+
+
+@router.get("/gen-eval", summary="查看生成评测历史（内部诊断，仅管理员）")
+def list_gen_eval_runs(_: UserContext = Depends(require_admin)):
+    runs = read_gen_reports()
+    latest = runs[-1] if runs else None
+    summary = [
+        {"run": i, "note": r.get("note"), "metrics": r.get("metrics")}
+        for i, r in enumerate(runs, start=1)
+    ]
+    return ok({"total": len(runs), "latest": latest, "summary": summary})
+
+
+@router.post("/gen-eval", summary="跑一轮生成评测（仅管理员；真调 LLM，有 token 花费）")
+def run_gen_eval_now(
+    req: GenEvalRequest = GenEvalRequest(),
+    _: UserContext = Depends(require_admin),
+):
+    try:
+        report = run_gen_eval(note=req.note)
+    except ValueError as e:
+        return error(40001, str(e))
+    except Exception as e:
+        return error(50001, f"生成评测失败：{e}", status=500)
     return ok(report)
 
 
