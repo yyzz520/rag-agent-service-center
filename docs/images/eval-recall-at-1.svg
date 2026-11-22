@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420" role="img" aria-label="RAG 检索 recall@1 对比">
   <rect width="900" height="420" fill="#ffffff"/>
   <text x="40" y="40" font-size="20" font-weight="700" fill="#0f172a">RAG 检索评测：recall@1（rerank 关 → 开）</text>
-  <text x="40" y="64" font-size="13" fill="#475569">61 题固定回归集 · 关 rerank：recall@1 0.59 / MRR 0.775 · 开 rerank：1.0 / 1.0</text>
+  <text x="40" y="64" font-size="13" fill="#475569">61 题固定回归集 · 关 rerank：recall@1 0.59 / MRR 0.772 · 开 rerank：1.0 / 1.0</text>
 
   <rect x="640" y="28" width="14" height="14" fill="#94a3b8" rx="2"/>
   <text x="660" y="40" font-size="12" fill="#334155">rerank 关</text>

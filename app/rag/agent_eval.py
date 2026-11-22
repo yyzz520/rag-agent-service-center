@@ -20,6 +20,7 @@ from app.agent.graph import build_agent, open_sync_checkpointer
 from app.config import settings
 from app.rag import cache
 from app.rag.trace import begin_trace, current_usage, end_trace, rotate_jsonl_if_needed, span
+from app.rag.vector_store import get_vectorstore
 
 EVAL_DIR = Path(settings.persist_dir).parent / "eval"  # data/eval，与 RAG 评测同目录
 TASKS_PATH = EVAL_DIR / "agent_tasks.json"
@@ -80,10 +81,25 @@ def _serialize_messages(messages: list) -> list[dict]:
     return out
 
 
+def _doc_ids_for_name(doc_name: str) -> list[str]:
+    """按文件名解析 doc_id，避免评测任务硬编码 uuid（换机器/重建库会失效）。"""
+    data = get_vectorstore().get(include=["metadatas"])
+    ids: list[str] = []
+    for md in data.get("metadatas") or []:
+        md = md or {}
+        source = md.get("source") or ""
+        doc_id = md.get("doc_id")
+        if doc_id and doc_name in source and doc_id not in ids:
+            ids.append(doc_id)
+    return ids
+
+
 def _run_task(task: dict) -> dict:
     """跑一条任务：全新 thread_id（不污染真实会话），返回工具路由与答案是否达标。"""
     question = task["question"]
     allowed = [task["doc"]] if task.get("doc") else None
+    if not allowed and task.get("doc_name"):
+        allowed = _doc_ids_for_name(task["doc_name"])
     conv = f"agent-eval-{uuid.uuid4().hex[:12]}"
     token = begin_trace(source="agent_eval", conversation_id=conv)
     try:

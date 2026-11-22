@@ -30,7 +30,7 @@
   },
   {
     "question": "公司 2025 年的净利润是多少？",
-    "doc": "f7ddd566230843b4ba30ba33fccbb333",
+    "doc_name": "清源缓释片说明书.pdf",
     "expect_answer_contains": "没有",
     "negative": true
   },

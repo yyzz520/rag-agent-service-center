@@ -120,7 +120,7 @@ make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
 - **RAG 检索**：关 rerank 时 recall@1 = 0.59、recall@5 = 0.984、MRR = 0.772、NDCG@16 = 0.83；开 rerank 后都到 1.0。按题型看，扫描件 recall@1 0.333 → 1.0，表格 0.625 → 1.0，单文档 0.6 → 1.0。
 - **生成**：12 条正样本正确率 91.7%、引用率 100%、引用正确率 100%；8 条负样本 8/8 干净拒答。
 - **回流**：`make export-finetune` 导出两类——RAG 答案样本（instruction/input/output，只导正确且引用正确的正样本 + 干净拒答负样本）和 Agent 轨迹（messages + tool_calls，只导成功且路由正确的任务）。
-- **Agent**：8 条任务，工具路由 1.0、完成率 0.875、平均 0.88 步、约 3073 token；负样本 2/3 干净拒答，禁工具任务 0 调用。这轮评测抓到 1 条完成失败、1 条负样本未拒答。
+- **Agent**：8 条任务，工具路由 1.0、完成率 1.0、平均 0.88 步、约 3071 token；负样本 3/3 干净拒答，禁工具任务 0 调用。
 - **诊断/门禁**：`GET /eval/diagnosis` 做规则化 badcase 归因（检索/精排/生成/拒答）；`make eval-gate` 指标低于 baseline 阈值直接非 0 退出。
 
 ![RAG 检索 recall@1 对比](docs/images/eval-recall-at-1.svg)
