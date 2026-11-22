@@ -107,6 +107,7 @@ python3 -m venv .venv
 make install-dev   # 建 .venv 并安装运行 + 测试依赖
 make verify        # ruff + pytest，提交前必跑
 make eval-gate     # 最近一次评测 vs baseline 阈值，低于阈值非 0 退出
+make eval-router   # 路由准确率/混淆矩阵（规则分类，零 LLM 花费）
 make quality-report # 从 trace 聚合各阶段 p50/p95 耗时与 token 消耗（DAYS=7）
 make seed          # 启动服务后一键上传 samples/medical（已存在跳过）
 make seed-eval     # seed + 跑一次检索评测
@@ -122,7 +123,8 @@ make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
 |---|---|---|---|
 | RAG 检索 | 61 题 × 9 份合成语料，**只重放检索、不出答案** | 零 LLM 花费 | recall@k / MRR |
 | 生成 | 12 条正样本 + 8 条负样本，**真跑 RAG 生成** | 有花费 | 正确率 / 引用率 / 拒答率 |
-| Agent 行为 | 8 条固定任务（含负样本/禁工具），**真跑 LLM** | 有花费 | 路由正确率 / 完成率 / 步数 / token / 拒答率 / 禁工具调用率 |
+| Agent 行为 | 8 条固定任务（含负样本/禁工具），**真跑 LLM** | 有花费 | 工具路由正确率 / 完成率 / 步数 / token / 拒答率 / 禁工具调用率 |
+| 意图路由 | 14 条固定问法（含无外部工具回退） | 零 LLM 花费 | 路由准确率 / 各路由 precision·recall / 混淆矩阵 |
 
 同一组题改参数重跑即可逐行对比。实测示例：
 

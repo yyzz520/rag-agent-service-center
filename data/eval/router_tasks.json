@@ -1,0 +1,16 @@
+[
+  {"question": "你好", "expect_route": "chat"},
+  {"question": "谢谢，再见", "expect_route": "chat"},
+  {"question": "你是谁", "expect_route": "chat"},
+  {"question": "查一下批号 QS-2024-9527 现在在哪个库区", "expect_route": "tool"},
+  {"question": "QS-2024-8831 的在库状态和放行状态是什么", "expect_route": "tool"},
+  {"question": "这批货的物流状态到哪了", "expect_route": "tool"},
+  {"question": "你好，帮我查批号 QS-2024-9527", "expect_route": "tool"},
+  {"question": "冷藏库的温度要求是什么", "expect_route": "rag"},
+  {"question": "仓库的温控要求是什么", "expect_route": "rag"},
+  {"question": "偏差按影响程度分成哪几级", "expect_route": "rag"},
+  {"question": "CTD 注册资料的模块三放什么内容", "expect_route": "rag"},
+  {"question": "请问仓储管理的记录保存几年", "expect_route": "rag"},
+  {"question": "帮我总结一下这份文档", "expect_route": "rag"},
+  {"question": "查一下批号 QS-2024-9527 的库存", "expect_route": "rag", "has_external_tools": false}
+]

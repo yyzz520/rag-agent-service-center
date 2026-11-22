@@ -20,6 +20,7 @@ from app.rag.agent_eval import read_agent_reports, run_agent_eval
 from app.rag.diagnosis import run_diagnosis
 from app.rag.eval import read_reports, run_eval
 from app.rag.gen_eval import read_gen_reports, run_gen_eval
+from app.rag.router_eval import read_router_reports, run_router_eval
 from app.services.audit import record as audit_record
 
 router = APIRouter(prefix="/eval", tags=["评测"])
@@ -41,6 +42,10 @@ class AgentEvalRequest(BaseModel):
     note: str | None = Field(default=None, description="给这次运行打个标签，便于和历史里的其他运行区分")
 
 
+class RouterEvalRequest(BaseModel):
+    note: str | None = Field(default=None, description="给这次运行打个标签，便于和历史里的其他运行区分")
+
+
 def _history(runs: list[dict]) -> dict:
     return {
         "total": len(runs),
@@ -50,6 +55,27 @@ def _history(runs: list[dict]) -> dict:
             for i, r in enumerate(runs, start=1)
         ],
     }
+
+
+@router.get("/router", summary="查看路由评测历史（仅管理员）")
+def list_router_runs(_: UserContext = Depends(require_permission("eval:read"))):
+    return ok(_history(read_router_reports()))
+
+
+@router.post("/router", summary="跑一轮路由评测（仅管理员；规则分类，不调模型）")
+def run_router_now(
+    req: RouterEvalRequest = RouterEvalRequest(),
+    user: UserContext = Depends(require_permission("eval:run")),
+    db: Session = Depends(get_db),
+):
+    try:
+        report = run_router_eval(note=req.note)
+    except ValueError as e:
+        return error(40001, str(e))
+    except Exception as e:
+        return error(50001, f"路由评测失败：{e}", status=500)
+    audit_record(db, user, "eval.router", req.note or "", f"accuracy={report['metrics'].get('accuracy')}")
+    return ok(report)
 
 
 @router.get("/retrieval", summary="查看检索评测历史（仅管理员）")

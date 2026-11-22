@@ -1,7 +1,7 @@
 PYTHON ?= .venv/bin/python
 DAYS ?= 7
 
-.PHONY: venv install install-dev test lint verify eval-gate export-finetune quality-report seed seed-eval reindex security run
+.PHONY: venv install install-dev test lint verify eval-gate eval-router export-finetune quality-report seed seed-eval reindex security run
 
 .venv:
 	python3 -m venv .venv
@@ -27,6 +27,9 @@ eval-gate:
 
 export-finetune:
 	$(PYTHON) scripts/export_finetune.py
+
+eval-router:
+	$(PYTHON) scripts/router_eval.py
 
 quality-report:
 	$(PYTHON) scripts/quality_report.py --days $(DAYS)

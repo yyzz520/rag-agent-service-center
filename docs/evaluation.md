@@ -42,14 +42,22 @@
 
 **统计口径**：报告带正确率/引用率/拒答率的 95% bootstrap 区间（`metrics.ci95`）。`POST /rag/gen-eval` 传 `repeat>1` 可同题多跑 N 轮（成本 ×N），报告额外给 `stability`（min/max/std）；默认 `repeat=1`，稳定性按需开。
 
-## 3. Agent 行为评测（8 任务）
+## 3. 意图路由评测（14 题）
+
+- 数据集：`data/eval/router_tasks.json`，覆盖 `chat` / `rag` / `tool`，含"没有外部工具时 tool 退回 rag"的用例。
+- 成本：只跑规则分类，**零 LLM 花费**。
+- 指标：准确率、各路由 precision/recall/F1、混淆矩阵；报告带 95% bootstrap 区间与题集指纹。
+- 实测：14/14 = 1.000（固定小集，用于回归关键词与优先级，不代表开放域准确率）。
+- 改关键词/优先级后 `make eval-router` 重跑即可回归；接模型分类器时保持同一题集对比。
+
+## 4. Agent 行为评测（8 任务）
 
 - 数据集：`data/eval/agent_tasks.json`。
 - 真跑 LLM，评工具路由正确率、完成率、平均步数、平均 token、负样本拒答率、禁工具调用率。
 - 实测：路由 1.0、完成率 1.0、平均 0.88 步、约 3071 token；负样本 3/3 干净拒答，禁工具任务 0 调用。
 - Agent 评测会随模型调用波动，以最新报告为准；上一轮曾抓到 1 条完成失败，说明指标有区分度，不是恒为 1.0。
 
-## 4. Badcase 诊断
+## 5. Badcase 诊断
 
 `GET /api/v1/eval/diagnosis` 读最近一次三层评测，按规则归因：
 
@@ -70,10 +78,12 @@
 POST /api/v1/eval/retrieval     # 检索评测，可传 candidate_pool/per_query_top/max_docs/use_rerank
 POST /api/v1/eval/generation    # 生成评测
 POST /api/v1/eval/agent         # Agent 行为评测
+POST /api/v1/eval/router        # 意图路由评测（规则分类，零花费）
 
 GET  /api/v1/eval/retrieval     # 历史
 GET  /api/v1/eval/generation
 GET  /api/v1/eval/agent
+GET  /api/v1/eval/router
 GET  /api/v1/eval/summary       # 三层最新指标汇总
 GET  /api/v1/eval/diagnosis     # 最近一次评测的规则化 badcase 归因
 ```
