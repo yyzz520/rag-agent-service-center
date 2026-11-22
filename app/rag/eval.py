@@ -22,6 +22,7 @@ from pathlib import Path
 from app.config import settings
 from app.rag import cache, manifest, prompts
 from app.rag.retrieval import RAGRetriever
+from app.rag.stats import bootstrap_ci
 from app.rag.trace import rotate_jsonl_if_needed  # 与 trace 共用同一轮转口径
 
 EVAL_DIR = Path(settings.persist_dir).parent / "eval"  # data/eval，跟随 persist_dir
@@ -104,6 +105,11 @@ def _metrics_for(results: list[dict], k: int) -> dict:
     ) if total else 0.0
     metrics["hits"] = len(hits)
     metrics["total"] = total
+    # 小样本别只报点估计：给出逐题二值/倒数排名的 95% bootstrap 区间
+    metrics["ci95"] = {
+        f"recall@{k}": bootstrap_ci([1.0 if r["hit"] and r["rank"] <= k else 0.0 for r in results]),
+        "mrr": bootstrap_ci([1.0 / r["rank"] if r["hit"] else 0.0 for r in results]),
+    }
     return metrics
 
 

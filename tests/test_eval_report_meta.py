@@ -27,8 +27,11 @@ def test_gen_eval_report_records_prompt_version_and_dataset(monkeypatch, tmp_pat
         "judge_error": False,
     })
 
-    report = gen_eval.run_gen_eval(note="meta")
+    report = gen_eval.run_gen_eval(note="meta", repeat=2)
 
+    assert report["repeat"] == 2
+    assert "ci95" in report["metrics"]
+    assert report["stability"]["correct_rate"]["runs"] == 2
     assert report["prompt_version"] == prompts.versions(("citation", "judge"))
     assert report["dataset"]["items"] == 1
     assert len(report["dataset"]["sha256"]) == 64

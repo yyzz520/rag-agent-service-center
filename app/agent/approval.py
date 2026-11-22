@@ -25,6 +25,7 @@ LOCAL_READ_ONLY_TOOLS = frozenset({"search_knowledge_base", "calculator"})
 
 _REJECT_CONTENT = "人工审批未通过，该工具未执行。请基于已有信息继续，或说明无法完成。"
 _REPEAT_CONTENT = "该工具调用此前已提交执行（幂等保护），本次不再重复执行；请人工复核上一次执行结果。"
+_LEDGER_DOWN_CONTENT = "执行台账不可用，无法确认幂等状态；为避免重复副作用，本次未执行该工具。请稍后重试或人工处理。"
 
 
 class AgentAwaitingApproval(Exception):
@@ -69,14 +70,19 @@ def reject_decisions(payload: dict) -> dict:
     }
 
 
-def _mark_executed(scope: str, call: dict) -> bool:
-    """执行前落账；返回 False = 同一 tool_call_id 已执行过（重放），本次应跳过。"""
-    return execution_ledger.mark_executed(
-        scope,
-        call["id"],
-        call.get("name", ""),
-        json.dumps(call.get("args") or {}, ensure_ascii=False, sort_keys=True),
-    )
+def _mark_execution(scope: str, call: dict) -> str:
+    """执行前落账：ok / duplicate（重放）/ unavailable（台账故障，fail-closed 不执行）。"""
+    try:
+        ok = execution_ledger.mark_executed(
+            scope,
+            call["id"],
+            call.get("name", ""),
+            json.dumps(call.get("args") or {}, ensure_ascii=False, sort_keys=True),
+        )
+        return "ok" if ok else "duplicate"
+    except Exception:
+        logger.warning("执行台账不可用，按未执行处理（fail-closed）", exc_info=True)
+        return "unavailable"
 
 
 def make_approval_hook(scope: str = "no-scope"):
@@ -122,25 +128,34 @@ def make_approval_hook(scope: str = "no-scope"):
             edit_args = (by_id.get(call["id"]) or {}).get("args")
             if decision == "edit" and not isinstance(edit_args, dict):
                 decision = "reject"  # 说改参数却没给参数，按拒绝兜底
-            executed = False
+            status = ""
             if decision == "approve":
-                executed = _mark_executed(scope, call)
-                if executed:
+                status = _mark_execution(scope, call)
+                if status == "ok":
                     new_calls.append(call)
             elif decision == "edit":
                 edited = {**call, "args": edit_args}
-                executed = _mark_executed(scope, edited)
-                if executed:
+                status = _mark_execution(scope, edited)
+                if status == "ok":
                     new_calls.append(edited)
-            if decision in ("approve", "edit") and not executed:
-                # 同一 tool_call_id 已执行过（崩溃/重放）：at-most-once，不重复副作用
-                updates.append(ToolMessage(
-                    content=_REPEAT_CONTENT,
-                    tool_call_id=call["id"],
-                    name=call.get("name"),
-                    additional_kwargs={"approval": "duplicate"},
-                ))
-            elif decision not in ("approve", "edit"):
+            if decision in ("approve", "edit"):
+                if status == "duplicate":
+                    # 同一 tool_call_id 已执行过（崩溃/重放）：at-most-once，不重复副作用
+                    updates.append(ToolMessage(
+                        content=_REPEAT_CONTENT,
+                        tool_call_id=call["id"],
+                        name=call.get("name"),
+                        additional_kwargs={"approval": "duplicate"},
+                    ))
+                elif status == "unavailable":
+                    # 台账故障：无法确认幂等状态，fail-closed 不执行
+                    updates.append(ToolMessage(
+                        content=_LEDGER_DOWN_CONTENT,
+                        tool_call_id=call["id"],
+                        name=call.get("name"),
+                        additional_kwargs={"approval": "ledger_unavailable"},
+                    ))
+            else:
                 # 缺失/超时/拒绝一律按拒绝处理（fail-closed），把结果作为工具消息回给模型
                 updates.append(ToolMessage(
                     content=_REJECT_CONTENT,

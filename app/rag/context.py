@@ -17,8 +17,12 @@ def expand_parents(docs: list[Document]) -> list[Document]:
     if not parent_ids:
         return docs
     try:
-        raw = get_vectorstore().get(ids=parent_ids, include=["documents"])
-        parents = dict(zip(raw.get("ids", []), raw.get("documents", [])))
+        raw = get_vectorstore().get(ids=parent_ids, include=["documents", "metadatas"])
+        contents = raw.get("documents") or []
+        metas = raw.get("metadatas")
+        if metas is None:  # 兼容只返回 documents 的 store/测试桩
+            metas = [None] * len(contents)
+        parents = dict(zip(raw.get("ids", []), zip(contents, metas)))
     except Exception:
         return docs
 
@@ -34,8 +38,16 @@ def expand_parents(docs: list[Document]) -> list[Document]:
             continue
         if pid in seen:
             continue
-        content = parents.get(pid)
-        if content:
+        hit = parents.get(pid)
+        if hit:
+            content, parent_meta = hit
+            # 防御：父块若不属于同一个 doc_id（数据污染/恶意 parent_id），退回子块，
+            # 不让跨文档/跨租户的内容通过 parent 扩展混进上下文。
+            child_doc = d.metadata.get("doc_id")
+            parent_doc = (parent_meta or {}).get("doc_id")
+            if child_doc and parent_doc and child_doc != parent_doc:
+                out.append(d)
+                continue
             meta = dict(d.metadata)
             meta["chunk_level"] = "parent"
             meta["parent_id"] = pid

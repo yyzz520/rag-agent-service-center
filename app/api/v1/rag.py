@@ -8,8 +8,11 @@ from sqlalchemy.orm import Session
 
 from app.api.responses import error, ok
 from app.api.sse import sse_event
+from app.config import settings
 from app.core.quota import enforce_quota
 from app.core.security import UserContext, require_admin
+from app.core.token_budget import add as add_tokens
+from app.core.token_budget import check as check_tokens
 from app.db import get_db
 from app.rag.chain import get_backup_llm, make_answer_chain, retrieve_context, run_rag
 
@@ -46,6 +49,24 @@ class AgentEvalRequest(BaseModel):
 
 class GenEvalRequest(BaseModel):
     note: str | None = Field(default=None, description="给这次运行打个标签，便于和历史里的其他运行区分")
+    repeat: int = Field(default=1, ge=1, le=5, description="同题多跑 N 轮看稳定性（成本 ×N）")
+
+
+def _token_budget_error(user: UserContext):
+    ok, used = check_tokens(user.tenant_id)
+    if not ok:
+        return error(
+            42902,
+            f"租户日 token 预算已用完（{used}/{settings.tenant_daily_token_budget}）",
+            status=429,
+        )
+    return None
+
+
+def _record_tokens(tenant_id: str) -> None:
+    usage = current_usage()
+    if usage is not None and usage.total_tokens:
+        add_tokens(tenant_id, usage.total_tokens)
 
 
 def _resolve_scope_or_error(
@@ -72,6 +93,9 @@ def chat(
     allowed, err = _resolve_scope_or_error(db, user, req.doc)
     if err is not None:
         return err
+    berr = _token_budget_error(user)
+    if berr is not None:
+        return berr
     token = begin_trace(source="rag")
     try:
         try:
@@ -91,6 +115,7 @@ def chat(
     except Exception as e:
         return error(50001, f"模型调用失败：{e}", status=500)
     finally:
+        _record_tokens(user.tenant_id)
         end_trace(token)
 
 
@@ -106,9 +131,12 @@ def chat_stream(
     allowed, err = _resolve_scope_or_error(db, user, req.doc)
     if err is not None:
         return err
+    berr = _token_budget_error(user)
+    if berr is not None:
+        return berr
     trace_id = uuid.uuid4().hex[:12]
     return StreamingResponse(
-        _rag_stream(question, allowed, trace_id),
+        _rag_stream(question, allowed, trace_id, user.tenant_id),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -151,7 +179,9 @@ async def _stream_answer(question: str, ctx: dict):
             yield text
 
 
-async def _rag_stream(question: str, allowed_doc_ids: list[str], trace_id: str):
+async def _rag_stream(
+    question: str, allowed_doc_ids: list[str], trace_id: str, tenant_id: str
+):
     token = begin_trace(source="rag", trace_id=trace_id)
     try:
         yield sse_event("meta", {"trace_id": trace_id})
@@ -173,6 +203,7 @@ async def _rag_stream(question: str, allowed_doc_ids: list[str], trace_id: str):
         # 断连/异常：try/finally 保证 trace 收尾；错误透给前端
         yield sse_event("error", {"message": f"模型调用失败：{e}"})
     finally:
+        _record_tokens(tenant_id)
         end_trace(token)
 
 
@@ -259,7 +290,7 @@ def run_gen_eval_now(
     _: UserContext = Depends(require_admin),
 ):
     try:
-        report = run_gen_eval(note=req.note)
+        report = run_gen_eval(note=req.note, repeat=req.repeat)
     except ValueError as e:
         return error(40001, str(e))
     except Exception as e:

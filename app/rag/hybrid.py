@@ -55,15 +55,17 @@ def hybrid_candidates(
     if allowed_doc_ids is not None and not allowed_doc_ids:
         return []  # 空作用域 = 无文档可检索，直接空召回（空列表是假值，不早返回会退化成全库）
     where = {"doc_id": {"$in": allowed_doc_ids}} if allowed_doc_ids else None
-    # 只召回子块：父块只用于命中后补上下文，不参与检索排序。
+    allowed = set(allowed_doc_ids) if allowed_doc_ids else None
+    # 只召回子块（父块只用于命中后补上下文）；再按 doc_id 兜底过滤一次——
+    # 不把隔离完全押在向量库的 where 上（配置错误/Store 忽略过滤时这里是最后一道）。
     vec_docs = [
         d for d in get_retriever(k=vec_k, where=where).invoke(query)
         if d.metadata.get("chunk_level") != "parent"
+        and (allowed is None or d.metadata.get("doc_id") in allowed)
     ]
     bm25, all_docs = _get_bm25()
 
     bm_scores = bm25.get_scores(tokenize(query))
-    allowed = set(allowed_doc_ids) if allowed_doc_ids else None
     candidate_ids = [
         i for i in range(len(bm_scores))
         if all_docs[i].metadata.get("chunk_level") != "parent"

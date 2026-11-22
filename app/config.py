@@ -103,6 +103,10 @@ class Settings(BaseSettings):
     # 崩溃/重放时不再重复执行（at-most-once，宁可漏执行让人复核，不重复副作用）。
     agent_exec_ledger_path: str = "data/agent_tool_executions.db"
 
+    # 租户日 token 预算（0 = 关闭）：请求前检查、请求结束按 usage.total_tokens 记账。
+    # 和请求配额互补：配额防"次数"，这里防"单次长会话烧太多"。
+    tenant_daily_token_budget: int = 0
+
     # ---- 外部 MCP 工具（M5）----
     # 空 = 不接外部工具（默认，保证零配置能跑）。填 JSON 才启用，形如：
     #   {"wms":{"command":"python","args":["-m","mcp_servers.wms_server"],"transport":"stdio"}}

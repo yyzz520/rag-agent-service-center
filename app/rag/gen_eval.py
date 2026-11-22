@@ -18,6 +18,7 @@ from app.rag import cache, manifest, prompts
 from app.rag.chain import run_rag
 from app.rag.prompts import get_prompt
 from app.rag.refusal import REFUSAL_MARKERS
+from app.rag.stats import bootstrap_ci, stability
 from app.rag.trace import rotate_jsonl_if_needed
 
 EVAL_DIR = Path(settings.persist_dir).parent / "eval"
@@ -148,22 +149,39 @@ def _metrics(results: list[dict]) -> dict:
         "refusal_any_rate": round(any_refused / len(negative), 3) if negative else 0.0,
         "negative_cited_rate": round(sum(1 for r in negative if r["cited"]) / len(negative), 3) if negative else 0.0,
         "judge_errors": sum(1 for r in positive if r.get("judge_error")),
+        "ci95": {
+            "correct_rate": bootstrap_ci([1.0 if r["correct"] else 0.0 for r in positive]),
+            "citation_rate": bootstrap_ci([1.0 if r["cited"] else 0.0 for r in positive]),
+            "refusal_rate": bootstrap_ci(
+                [1.0 if r.get("reason") == "refused" else 0.0 for r in negative]
+            ),
+        },
     }
 
 
-def run_gen_eval(note: str | None = None) -> dict:
+def run_gen_eval(note: str | None = None, repeat: int = 1) -> dict:
+    """repeat>1：同一组题真跑 N 轮，给 min/max/std 的稳定性指标（成本 ×N，按需开）。"""
     golden = load_golden()
     if not golden:
         raise ValueError(f"没有生成评测集：请先建 {GOLDEN_PATH}")
-    results = [_run_item(item) for item in golden]
+    repeat = max(1, repeat)
+    runs = [[_run_item(item) for item in golden] for _ in range(repeat)]
+    results = [item for run in runs for item in run]
     report = {
         "ts": time.time(),
         "note": note,
+        "repeat": repeat,
         "prompt_version": prompts.versions(("citation", "judge")),
         "dataset": manifest.dataset_manifest(GOLDEN_PATH),
         "metrics": _metrics(results),
         "items": results,
     }
+    if repeat > 1:
+        run_metrics = [_metrics(run) for run in runs]
+        report["stability"] = {
+            key: stability([m[key] for m in run_metrics])
+            for key in ("correct_rate", "citation_rate", "refusal_rate")
+        }
     EVAL_DIR.mkdir(parents=True, exist_ok=True)
     with REPORTS_PATH.open("a", encoding="utf-8") as f:
         f.write(json.dumps(report, ensure_ascii=False) + "\n")
