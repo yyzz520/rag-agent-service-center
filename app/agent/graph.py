@@ -14,6 +14,7 @@ from app.agent.mcp_tools import get_mcp_tools
 from app.agent.tools import calculator, make_search_knowledge_base_tool
 from app.ai.providers import backup_llm, primary_llm
 from app.config import settings
+from app.rag.prompts import get_prompt
 from app.rag.trace import current_usage
 
 logger = logging.getLogger("app.agent.graph")
@@ -100,14 +101,7 @@ def init_checkpointer() -> None:
 
 # 系统提示词：约束"调知识库工具时以文档原文为准"，和 /rag/chat 的防幻觉口径一致。
 # 只在涉及文档时收紧，不拦计算器/闲聊类问题。
-_AGENT_SYSTEM = (
-    "你是一个能调用工具的智能助手。涉及用户文档/资料的问题，你会用 search_knowledge_base 检索。"
-    "该工具返回的是用户上传文档的原文片段，回答必须以其为准、直接引用文档内容，"
-    "不要凭自己的知识脑补文档里没有的内容；若工具返回『知识库中没有检索到相关内容』，"
-    "就如实告诉用户知识库里没有，不要编造。回答直接、简洁：文档里明确写了什么就答什么，"
-    "不要附加『可能因合同期限/地区/政策而有所不同』『请以实际合同为准』这类免责说明。"
-    "计算器等其他工具按正常方式使用。"
-)
+_AGENT_SYSTEM = get_prompt("agent").text
 
 
 def _scope_tools(allowed_doc_ids: list[str] | None):

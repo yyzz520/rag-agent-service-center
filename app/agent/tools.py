@@ -1,5 +1,6 @@
 from langchain_core.tools import tool
 
+from app.rag.context import expand_parents
 from app.rag.retrieval import get_rerank_retriever
 from app.rag.trace import current_trace_id, span
 
@@ -29,7 +30,9 @@ def make_search_knowledge_base_tool(allowed_doc_ids: list[str] | None):
         if key in seen:
             return f"（重复查询，复用上次结果）\n{seen[key]}"
         with span("tool.search_knowledge_base", trace_id=trace_id, query_len=len(query)):
-            docs = get_rerank_retriever(allowed_doc_ids=allowed_doc_ids).invoke(query)
+            docs = expand_parents(
+                get_rerank_retriever(allowed_doc_ids=allowed_doc_ids).invoke(query)
+            )
         result = "\n\n---\n\n".join(d.page_content for d in docs) if docs else "知识库中没有检索到相关内容。"
         seen[key] = result
         return result

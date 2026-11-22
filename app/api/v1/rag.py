@@ -17,6 +17,7 @@ logger = logging.getLogger("app.api.rag")
 from app.rag.agent_eval import read_agent_reports, run_agent_eval
 from app.rag.eval import read_reports, run_eval
 from app.rag.gen_eval import read_gen_reports, run_gen_eval
+from app.rag.refusal import finalize
 from app.rag.trace import begin_trace, current_usage, end_trace, log_answer, read_trace
 from app.rag.vector_store import get_vectorstore
 from app.services.access import owned_doc, owned_doc_ids
@@ -164,9 +165,10 @@ async def _rag_stream(question: str, allowed_doc_ids: list[str], trace_id: str):
         async for delta in _stream_answer(question, ctx):
             buf.append(delta)
             yield sse_event("content", {"delta": delta})
-        answer = "".join(buf)
+        # 流式已逐字吐出的内容改不了，但 done 里给收口后的终稿：整段拒答去 [n]、清空 sources。
+        answer, sources = finalize("".join(buf), ctx["sources"])
         log_answer(question, answer)
-        yield sse_event("done", {"answer": answer, "sources": ctx["sources"]})
+        yield sse_event("done", {"answer": answer, "sources": sources})
     except Exception as e:
         # 断连/异常：try/finally 保证 trace 收尾；错误透给前端
         yield sse_event("error", {"message": f"模型调用失败：{e}"})

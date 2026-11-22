@@ -4,6 +4,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from app.ai.providers import primary_llm
 from app.rag import cache
+from app.rag.prompts import get_prompt
 from app.rag.trace import current_usage
 
 
@@ -16,9 +17,7 @@ def get_rewrite_llm():
 def _build_rewrite_model():
     """改写查询直接输出 AIMessage：既取文本也要拿 usage_metadata 记账。"""
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "你是信息检索查询优化器。把用户问题改写成 2-3 个最适合检索的关键词查询，每行一个，不要编号和多余文字。"
-                   "要求：保留原文措辞，同时补充常见同义表述和文档里可能用的术语。"
-                   "例如「某某集团的总负债是多少」→\n总负债\n负债合计\n某某集团 负债"),
+        ("system", get_prompt("rewrite").text),
         ("human", "问题：{question}"),
     ])
     return prompt | get_rewrite_llm()

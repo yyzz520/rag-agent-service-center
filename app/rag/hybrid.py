@@ -55,18 +55,20 @@ def hybrid_candidates(
     if allowed_doc_ids is not None and not allowed_doc_ids:
         return []  # 空作用域 = 无文档可检索，直接空召回（空列表是假值，不早返回会退化成全库）
     where = {"doc_id": {"$in": allowed_doc_ids}} if allowed_doc_ids else None
-    vec_docs = get_retriever(k=vec_k, where=where).invoke(query)
+    # 只召回子块：父块只用于命中后补上下文，不参与检索排序。
+    vec_docs = [
+        d for d in get_retriever(k=vec_k, where=where).invoke(query)
+        if d.metadata.get("chunk_level") != "parent"
+    ]
     bm25, all_docs = _get_bm25()
 
     bm_scores = bm25.get_scores(tokenize(query))
-    if allowed_doc_ids:
-        allowed = set(allowed_doc_ids)
-        candidate_ids = [
-            i for i in range(len(bm_scores))
-            if all_docs[i].metadata.get("doc_id") in allowed
-        ]
-    else:
-        candidate_ids = list(range(len(bm_scores)))
+    allowed = set(allowed_doc_ids) if allowed_doc_ids else None
+    candidate_ids = [
+        i for i in range(len(bm_scores))
+        if all_docs[i].metadata.get("chunk_level") != "parent"
+        and (allowed is None or all_docs[i].metadata.get("doc_id") in allowed)
+    ]
     bm_ranked = sorted(candidate_ids, key=lambda i: -bm_scores[i])[:bm_k]
 
     rrf: dict[str, tuple[Document, float]] = {}

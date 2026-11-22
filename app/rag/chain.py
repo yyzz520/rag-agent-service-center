@@ -8,7 +8,10 @@ from functools import lru_cache
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.ai.providers import backup_llm, primary_llm
+from app.rag.context import expand_parents
 from app.rag.guard import sanitize_context
+from app.rag.prompts import get_prompt
+from app.rag.refusal import finalize
 from app.rag.retrieval import get_rerank_retriever
 from app.rag.trace import chunk_id, current_usage, span
 
@@ -24,14 +27,6 @@ def get_llm():
 @lru_cache
 def get_backup_llm():
     return backup_llm(_ANSWER_TEMPERATURE)
-
-
-_CITATION_SYSTEM = (
-    '你是知识库问答助手。请严格依据下面带编号的资料回答；资料里没有的内容，'
-    '直接说"资料中没有相关内容"，不要编造。'
-    "回答时在依据某份资料的句子后标注来源编号，例如 [3]；"
-    "同一句依据多份资料时全部列出，例如 [1][4]。"
-)
 
 
 def _format_sources(docs: list) -> tuple[str, list[dict]]:
@@ -59,7 +54,7 @@ def make_answer_chain(llm=None):
     流式 .astream 复用同一条链，保证流式与一次性输出同 prompt、同模型。
     """
     prompt = ChatPromptTemplate.from_messages([
-        ("system", _CITATION_SYSTEM + "\n\n资料：\n{context}"),
+        ("system", get_prompt("citation").text + "\n\n资料：\n{context}"),
         ("human", "问题：{question}"),
     ])
     return prompt | (llm or get_llm())
@@ -70,7 +65,9 @@ def retrieve_context(
 ) -> dict | None:
     """只做检索，返回 {"context", "sources"}；无命中返回 None。流式与一次性共用这一份检索逻辑。"""
     with span("retrieval", question_len=len(question)):
-        docs = get_rerank_retriever(allowed_doc_ids=allowed_doc_ids).invoke(question)
+        docs = expand_parents(
+            get_rerank_retriever(allowed_doc_ids=allowed_doc_ids).invoke(question)
+        )
     if not docs:
         return None
     context, sources = _format_sources(docs)
@@ -96,4 +93,6 @@ def run_rag(
     if rec is not None:
         rec.record(msg)
     text = msg.content if isinstance(msg.content, str) else str(msg.content)
-    return {"answer": text, "sources": ctx["sources"]}
+    # 拒答不该带引用：整段拒答时去掉 [n] 并清空 sources，评测与前端都按收口后的结果算。
+    answer, sources = finalize(text, ctx["sources"])
+    return {"answer": answer, "sources": sources}

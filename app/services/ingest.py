@@ -1,6 +1,6 @@
 """文档入库：存文件 → 切块打元数据 → 写向量 → doc 状态落库。
 
-load_document / get_splitter 是可插拔解析引擎的 builtin 主路径；
+load_document + chunk_documents 是可插拔解析/切块引擎的 builtin 主路径；
 M2 加 mineru_cloud / mineru_remote 时只换这里，不进路由层。
 后台任务解析不需要 user 上下文：doc 行已存 owner，worker 按 doc_id 取数即可（6.4）。
 """
@@ -12,8 +12,8 @@ from pathlib import Path
 from app.config import settings
 from app.db import SessionLocal
 from app.models import Doc
+from app.rag.chunker import chunk_documents
 from app.rag.loader import load_document
-from app.rag.splitter import get_splitter
 from app.rag.vector_store import add_documents, delete_by_doc_id
 
 ALLOWED_SUFFIX = {".txt", ".md", ".pdf", ".docx", ".xlsx"}
@@ -106,21 +106,21 @@ def parse_and_index(doc_id: str) -> None:
         if doc is None or doc.status != "parsing":
             return  # 已被删除或状态已推进
         path = Path(doc.storage_path)
-        chunks = get_splitter().split_documents(load_document(path))
-        for c in chunks:
-            meta = {
+        loaded = load_document(path)
+        for d in loaded:
+            d.metadata.update({
                 "source": doc.storage_path,  # 展示/溯源用；检索隔离看 doc_id，不看它
                 "doc_id": doc.id,
                 "user_id": doc.owner_id,
                 "kb_id": doc.kb_id,
-            }
-            page = c.metadata.get("page")
-            if page is not None:  # Chroma 不接受 None 元数据值
-                meta["page"] = page
-            c.metadata = meta
-        n = add_documents(chunks)
+            })
+        chunks = chunk_documents(loaded)
+        add_documents(chunks)
         doc.status = "ready"
-        doc.chunk_count = n
+        # 对外展示"可检索块数"（子块）；父块只用于补上下文，不算检索单元
+        doc.chunk_count = sum(
+            1 for c in chunks if c.metadata.get("chunk_level") == "child"
+        ) or len(chunks)
         doc.error_msg = None
         db.commit()
     except Exception as e:

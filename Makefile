@@ -1,6 +1,6 @@
 PYTHON ?= .venv/bin/python
 
-.PHONY: venv install install-dev test lint verify eval-gate export-finetune seed seed-eval security run
+.PHONY: venv install install-dev test lint verify eval-gate export-finetune seed seed-eval reindex security run
 
 .venv:
 	python3 -m venv .venv
@@ -32,6 +32,9 @@ seed:
 
 seed-eval:
 	$(PYTHON) scripts/seed_demo.py --eval
+
+reindex:
+	$(PYTHON) scripts/reindex_demo.py
 
 security:
 	$(PYTHON) scripts/check_secrets.py

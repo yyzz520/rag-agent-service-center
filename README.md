@@ -24,7 +24,7 @@
 
 | 能力 | 说明 |
 |---|---|
-| **检索** | 查询改写 → 向量 + BM25 混合 → RRF 融合 → Rerank 精排 → 带 `[n]` 引用作答 |
+| **检索** | 结构感知父子块切分（标题/章节/表格，子块检索、父块补上下文）→ 查询改写 → 向量 + BM25 混合 → RRF 融合 → Rerank 精排 → 带 `[n]` 引用作答 |
 | **Agent Harness** | LangGraph ReAct：工具注册、checkpointer 记忆、步数闸/工具防重/超时、MCP 外部工具；能力边界见 [Harness 层](docs/harness.md) |
 | **多租户** | 分块打 `doc_id/user_id/kb_id`，检索按本人文档在 Chroma / BM25 双路收窄 |
 | **多副本** | 限流 / 会话记忆 / 向量库 / 缓存全部外置，`--scale app=N` 后请求落到任何副本都正确 |
@@ -59,7 +59,7 @@ flowchart TD
   D -->|本地工具: 知识库检索 / 计算器| C
 ```
 
-- **RAG 链路**：上传 → 异步解析（load → split → embedding 入库）→ 提问时 **LLM 查询改写 → 混合检索（向量 + BM25）→ Rerank 重排** → LLM 带 `[n]` 溯源引用作答
+- **RAG 链路**：上传 → 异步解析 → **结构感知切块（标题/章节/表格，父块 + 子块）** → embedding 入库 → 提问时 **LLM 查询改写 → 混合检索（向量 + BM25）→ Rerank 重排** → 命中子块后取父块补上下文 → LLM 带 `[n]` 溯源引用作答
 - **Agent 链路**：LangGraph ReAct 状态机，LLM 决策 → 调工具（知识库检索 / 计算器 / 外部 MCP 工具）→ 再决策 → 输出；`thread_id=会话ID` 走 checkpointer，**服务重启后旧会话记忆仍在**
 - **长会话压缩**：历史超过阈值（默认 16 条）时，下一轮把更早对话折成摘要、只留最近 8 条原文，上下文不无限增长
 - **多格式解析**：`.txt/.md/.pdf/.docx/.xlsx`，Office/PDF 均带 MIME 内容嗅探；无文字层的扫描/图像 PDF 自动走 MinerU Cloud OCR
@@ -109,6 +109,7 @@ make verify        # ruff + pytest，提交前必跑
 make eval-gate     # 最近一次评测 vs baseline 阈值，低于阈值非 0 退出
 make seed          # 启动服务后一键上传 samples/medical（已存在跳过）
 make seed-eval     # seed + 跑一次检索评测
+make reindex       # 按当前切块策略重建本地索引（父子块）
 make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
 ```
 
@@ -126,9 +127,9 @@ make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
 
 - **RAG 检索**：关 rerank 时 recall@1 = 0.59、recall@5 = 0.984、MRR = 0.772、NDCG@16 = 0.83；开 rerank 后都到 1.0。按题型看，扫描件 recall@1 0.333 → 1.0，表格 0.625 → 1.0，单文档 0.6 → 1.0。
 - **生成**：12 条正样本正确率 91.7%、引用率 100%、引用正确率 100%；8 条负样本 8/8 干净拒答。
-- **回流**：`make export-finetune` 导出两类——RAG 答案样本（instruction/input/output，只导正确且引用正确的正样本 + 干净拒答负样本）和 Agent 轨迹（messages + tool_calls，只导成功且路由正确的任务）。
+- **回流**：`make export-finetune` 导出三类——RAG 答案样本（instruction/input/output，只导正确且引用正确的正样本 + 干净拒答负样本）、Agent 轨迹（messages + tool_calls，只导成功且路由正确的任务）、DPO 偏好对（同一题多轮评测里一正一误才配成对）。导出前做最小清洗：去重、长度过滤、手机号/身份证/邮箱/密钥脱敏、引用编号清理。
 - **Agent**：8 条任务，工具路由 1.0、完成率 1.0、平均 0.88 步、约 3071 token；负样本 3/3 干净拒答，禁工具任务 0 调用。
-- **诊断/门禁**：`GET /eval/diagnosis` 做规则化 badcase 归因（检索/精排/生成/拒答）；`make eval-gate` 指标低于 baseline 阈值直接非 0 退出。
+- **诊断/门禁**：`GET /eval/diagnosis` 做规则化 badcase 归因（检索/精排/生成/拒答）；`make eval-gate` 指标低于 baseline 阈值直接非 0 退出。每份评测报告都带 `prompt_version` 和 `dataset.sha256`（题集指纹），跨运行对比分数前先核对这两个是否一致。
 
 ![RAG 检索 recall@1 对比](docs/images/eval-recall-at-1.svg)
 

@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime
 from pathlib import Path
 
@@ -61,12 +62,22 @@ def _load_scanned_pdf(path: Path) -> list[Document]:
 
 
 def _load_docx(path: Path) -> Document:
-    """Word → 文本：按正文顺序抽段落与表格，合并单元格去重，空白规整。"""
+    """Word → 文本：按正文顺序抽段落与表格，合并单元格去重，空白规整。
+
+    标题样式（Heading 1 / 标题 1）转成 Markdown `#` 前缀，供结构感知切块使用；
+    样式丢失的文档仍会退化为无标题递归切分。
+    """
     doc = DocxDocument(str(path))
     parts: list[str] = []
     for child in doc.element.body.iterchildren():
         if child.tag == qn("w:p"):
-            text = DocxParagraph(child, doc).text.strip()
+            para = DocxParagraph(child, doc)
+            text = para.text.strip()
+            style = (getattr(para.style, "name", "") or "")
+            if text and ("Heading" in style or "标题" in style):
+                m = re.search(r"(\d+)", style)
+                level = int(m.group(1)) if m else 1
+                text = "#" * min(max(level, 1), 6) + " " + text
         elif child.tag == qn("w:tbl"):
             text = _docx_table_text(DocxTable(child, doc))
         else:
@@ -100,7 +111,7 @@ def _load_xlsx(path: Path) -> Document:
     parts: list[str] = []
     try:
         for ws in wb.worksheets:
-            parts.append(f"工作表：{ws.title}")
+            parts.append(f"## 工作表：{ws.title}")
             for row in ws.iter_rows(values_only=True):
                 cells = [_cell_text(v) for v in row]
                 cells = [c for c in cells if c]

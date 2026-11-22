@@ -14,33 +14,17 @@ from pathlib import Path
 
 from app.ai.providers import primary_llm
 from app.config import settings
-from app.rag import cache
+from app.rag import cache, manifest, prompts
 from app.rag.chain import run_rag
+from app.rag.prompts import get_prompt
+from app.rag.refusal import REFUSAL_MARKERS
 from app.rag.trace import rotate_jsonl_if_needed
 
 EVAL_DIR = Path(settings.persist_dir).parent / "eval"
 GOLDEN_PATH = EVAL_DIR / "golden_generation.json"
 REPORTS_PATH = EVAL_DIR / "gen_reports.jsonl"
 
-REFUSAL_MARKERS = (
-    "资料中没有相关内容",
-    "未检索到",
-    "没有找到",
-    "无法回答",
-    "没有相关信息",
-    "无法提供",
-    "资料中未提及",
-)
-
-_JUDGE_PROMPT = """你是严格的 RAG 评测裁判。只判断模型回答是否包含参考答案的关键事实，措辞不同不算错；不要依赖你自己的知识，只对照参考答案。
-
-问题：{question}
-参考答案：{expected}
-模型回答：{answer}
-
-只输出 JSON，不要 markdown：
-{{"correct": true 或 false, "reason": "一句话"}}
-"""
+_JUDGE_PROMPT = get_prompt("judge").text
 
 
 def load_golden() -> list[dict]:
@@ -175,6 +159,8 @@ def run_gen_eval(note: str | None = None) -> dict:
     report = {
         "ts": time.time(),
         "note": note,
+        "prompt_version": prompts.versions(("citation", "judge")),
+        "dataset": manifest.dataset_manifest(GOLDEN_PATH),
         "metrics": _metrics(results),
         "items": results,
     }

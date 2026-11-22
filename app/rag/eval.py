@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 
 from app.config import settings
-from app.rag import cache
+from app.rag import cache, manifest, prompts
 from app.rag.retrieval import RAGRetriever
 from app.rag.trace import rotate_jsonl_if_needed  # 与 trace 共用同一轮转口径
 
@@ -145,6 +145,8 @@ def run_eval(note: str | None = None, overrides: dict | None = None) -> dict:
     report = {
         "ts": time.time(),
         "note": note,
+        "prompt_version": prompts.versions(("rewrite",)),
+        "dataset": manifest.dataset_manifest(GOLDEN_PATH),
         "metrics": _metrics(results, params["max_docs"]),
         "params": params,
         "items": results,

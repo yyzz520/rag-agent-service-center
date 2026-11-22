@@ -2,6 +2,7 @@ from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 
 from app.rag import cache
+from app.rag.context import expand_parents
 from app.rag.hybrid import hybrid_candidates
 from app.rag.reranker import get_reranker
 from app.rag.rewriter import rewrite_query
@@ -45,7 +46,8 @@ class RAGRetriever(BaseRetriever):
         rewritten = rewrite_query(query)
         for q in rewritten:
             pool_pairs = hybrid_candidates(q, allowed_doc_ids=self.allowed_doc_ids)
-            pool = [d for d, _ in pool_pairs][: self.candidate_pool]
+            # 小到大：子块先召回，按 parent_id 聚成父块后再做 rerank/排序。
+            pool = expand_parents([d for d, _ in pool_pairs])[: self.candidate_pool]
             if not pool:
                 continue
             # pool 本身按 RRF 分倒序，所以池内下标 +1 就是 rerank 之前的 RRF 名次。

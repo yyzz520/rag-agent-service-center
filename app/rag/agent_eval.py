@@ -18,7 +18,7 @@ from langchain_core.messages import HumanMessage
 
 from app.agent.graph import build_agent, open_sync_checkpointer
 from app.config import settings
-from app.rag import cache
+from app.rag import cache, manifest, prompts
 from app.rag.trace import begin_trace, current_usage, end_trace, rotate_jsonl_if_needed, span
 from app.rag.vector_store import get_vectorstore
 
@@ -183,6 +183,8 @@ def run_agent_eval(note: str | None = None) -> dict:
     report = {
         "ts": time.time(),
         "note": note,
+        "prompt_version": prompts.versions(("agent", "citation")),
+        "dataset": manifest.dataset_manifest(TASKS_PATH),
         "metrics": _metrics(results),
         "items": results,
     }
