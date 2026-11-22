@@ -6,11 +6,13 @@ from sqlalchemy.orm import Session
 
 from app.api.responses import error, ok
 from app.config import settings
+from app.core.quota import enforce_quota
 from app.core.security import UserContext, get_current_user
 from app.db import get_db
 from app.models import Doc
 from app.rag.vector_store import delete_by_doc_id
 from app.services.access import get_or_create_default_kb, owned_doc, owned_kb
+from app.services.audit import record as audit_record
 from app.services.ingest import (
     delete_doc_files,
     parse_and_index,
@@ -43,7 +45,7 @@ def upload_doc(
     background: BackgroundTasks,
     file: UploadFile = File(...),
     kb_id: str | None = Query(default=None, description="可选：指定知识库；不填用该用户的默认知识库"),
-    user: UserContext = Depends(get_current_user),
+    user: UserContext = Depends(enforce_quota),
     db: Session = Depends(get_db),
 ):
     try:
@@ -82,6 +84,7 @@ def upload_doc(
     db.add(doc)
     db.commit()
     db.refresh(doc)
+    audit_record(db, user, "doc.upload", doc.id, file_name)
     background.add_task(parse_and_index, doc.id)
     return ok(_serialize(doc, kb_name=kb.name))
 
@@ -118,6 +121,8 @@ def delete_doc(doc_id: str, user: UserContext = Depends(get_current_user), db: S
         return error(40002, "文档不存在或无权访问")
     deleted = delete_by_doc_id(doc.id)
     delete_doc_files(doc)
+    file_name = doc.file_name
     db.delete(doc)
     db.commit()
+    audit_record(db, user, "doc.delete", doc_id, file_name)
     return ok({"doc_id": doc_id, "chunks_deleted": deleted})

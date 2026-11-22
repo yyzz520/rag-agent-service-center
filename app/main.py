@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from app.agent.graph import init_checkpointer
 from app.agent.mcp_tools import get_mcp_tools
 from app.api.responses import ok
-from app.api.v1 import agent, auth, docs, eval as eval_api, kb, rag, sessions
+from app.api.v1 import agent, audit, auth, docs, eval as eval_api, kb, rag, sessions
 from app.config import settings
 from app.core.metrics import record_request, render_prometheus
 from app.db import init_db
@@ -162,6 +162,7 @@ async def access_log(request: Request, call_next):
 
 
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(audit.router, prefix="/api/v1")
 app.include_router(kb.router, prefix="/api/v1")
 app.include_router(docs.router, prefix="/api/v1")
 app.include_router(rag.router, prefix="/api/v1")

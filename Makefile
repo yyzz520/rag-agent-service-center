@@ -1,6 +1,6 @@
 PYTHON ?= .venv/bin/python
 
-.PHONY: venv install install-dev test lint verify eval-gate export-finetune seed seed-eval run
+.PHONY: venv install install-dev test lint verify eval-gate export-finetune seed seed-eval security run
 
 .venv:
 	python3 -m venv .venv
@@ -32,6 +32,10 @@ seed:
 
 seed-eval:
 	$(PYTHON) scripts/seed_demo.py --eval
+
+security:
+	$(PYTHON) scripts/check_secrets.py
+	$(PYTHON) -m pip_audit -r requirements.txt || true
 
 run:
 	DB_URL='sqlite:///data/app.db' \

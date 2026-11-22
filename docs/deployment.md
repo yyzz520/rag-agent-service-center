@@ -229,6 +229,17 @@ curl -X POST http://localhost:8201/api/v1/docs \
   -F "file=@演示.md"
 ```
 
+## 企业治理、K8s 与监控
+
+- **RBAC**：`admin` / `user` 角色，接口按权限点收口（`eval:run`、`eval:read`、`audit:read` 等）；普通用户访问评测/审计返回 403。
+- **审计**：登录、文档上传/删除、三层评测运行写 `audit_log`；`GET /api/v1/audit` 管理员查询，可按 `tenant_id` 过滤。
+- **配额**：`DAILY_REQUEST_QUOTA` 按租户每日计数（Redis 全局；Redis 不可用退回进程内）；突发限流仍由 `RATE_LIMIT_PER_MIN` 负责。
+- **Helm**：`deploy/helm/rag-agent-service`，`helm install rag-agent deploy/helm/rag-agent-service -f values.yaml`；外部依赖 Postgres / Redis / Chroma server 建议独立部署。
+- **监控**：`deploy/monitoring/prometheus.yml` 抓 `/metrics`，`alerts.yml` 配 5xx/延迟/实例下线告警，`grafana-dashboard.json` 可直接导入。
+- **安全**：`make security` 跑密钥检查 + 依赖审计；检索到的上下文会过滤“忽略以上指令”类注入文本。
+
+> Helm/监控文件是生产部署脚手架；本机未安装 Helm，未做 `helm template` 实跑。
+
 ## 数据说明
 
 - `data/`（SQLite + Chroma + trace + 评测报告）、`uploads/`（源文件）默认被 `.gitignore` 忽略，新 clone 需自行上传文档建库。**只有 `data/eval/golden.json`、`golden_generation.json` 和 `agent_tasks.json` 三个评测数据集被放行**，保证 clone 后能直接复跑评测。

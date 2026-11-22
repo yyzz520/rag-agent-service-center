@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.3
+## 0.4.4
 
 ### Added
 
@@ -16,6 +16,9 @@
 - Agent 评测报告新增 `trajectory` 字段，支持轨迹级数据回流。
 - 诊断支持 Agent 失败跨层归因：调了知识库仍答错 → 检索召回可疑；没调知识库 → 路由/生成。
 - `make seed` / `make seed-eval` 一键灌入 samples/medical 并可选跑检索评测。
+- 企业治理：RBAC 权限点、tenant 审计日志、按租户日配额、限流。
+- 部署/监控：Helm chart、Prometheus 抓取与告警、Grafana 看板。
+- 安全：检索上下文注入过滤、密钥检查、依赖审计入口。
 - Docker 非 root 运行。
 
 ### Changed

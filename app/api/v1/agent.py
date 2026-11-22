@@ -22,7 +22,8 @@ logger = logging.getLogger("app.api.agent")
 from app.api.responses import error, ok
 from app.api.sse import sse_event
 from app.config import settings
-from app.core.security import UserContext, get_current_user
+from app.core.quota import enforce_quota
+from app.core.security import UserContext
 from app.db import get_db
 from app.models import Session as ChatSession
 from app.rag.trace import begin_trace, current_usage, end_trace, log_answer, span
@@ -151,7 +152,7 @@ def _count_usage_from_messages(messages: list, tool_count: int) -> None:
 @router.post("/chat", summary="智能体对话（持久化会话记忆，仅限本人文档与会话）")
 def agent_chat(
     req: AgentRequest,
-    user: UserContext = Depends(get_current_user),
+    user: UserContext = Depends(enforce_quota),
     db: Session = Depends(get_db),
 ):
     question = req.question.strip()
@@ -199,7 +200,7 @@ def agent_chat(
 @router.post("/chat/stream", summary="智能体流式对话（SSE）：meta → content(逐字)/tool_start/tool_end → done / error")
 def agent_chat_stream(
     req: AgentRequest,
-    user: UserContext = Depends(get_current_user),
+    user: UserContext = Depends(enforce_quota),
     db: Session = Depends(get_db),
 ):
     question = req.question.strip()

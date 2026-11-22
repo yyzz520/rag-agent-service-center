@@ -1,0 +1,34 @@
+groups:
+  - name: rag-agent
+    rules:
+      - alert: RagAgentInstanceDown
+        expr: up{job="rag-agent"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "RAG Agent instance is down"
+
+      - alert: RagAgentHigh5xxRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+          /
+          clamp_min(sum(rate(http_requests_total[5m])), 0.001)
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "5xx rate > 5% for 5 minutes"
+
+      - alert: RagAgentHighAvgLatency
+        expr: |
+          sum(rate(http_request_duration_seconds_sum[5m]))
+          /
+          clamp_min(sum(rate(http_request_duration_seconds_count[5m])), 0.001)
+          > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Average request latency > 2s"

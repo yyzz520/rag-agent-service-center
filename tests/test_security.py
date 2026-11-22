@@ -13,3 +13,4 @@ def test_token_roundtrip():
     payload = decode_token(token)
     assert payload["sub"] == "admin"
     assert payload["role"] == "admin"
+    assert payload["tenant_id"] == "tenant-admin"

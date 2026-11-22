@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.api.responses import error, ok
 from app.api.sse import sse_event
-from app.core.security import UserContext, get_current_user, require_admin
+from app.core.quota import enforce_quota
+from app.core.security import UserContext, require_admin
 from app.db import get_db
 from app.rag.chain import get_backup_llm, make_answer_chain, retrieve_context, run_rag
 
@@ -61,7 +62,7 @@ def _resolve_scope_or_error(
 @router.post("/chat", summary="RAG 知识库问答（带溯源，仅限本人文档）")
 def chat(
     req: ChatRequest,
-    user: UserContext = Depends(get_current_user),
+    user: UserContext = Depends(enforce_quota),
     db: Session = Depends(get_db),
 ):
     question = req.question.strip()
@@ -95,7 +96,7 @@ def chat(
 @router.post("/chat/stream", summary="RAG 流式问答（SSE）：meta → content(逐字) → done(answer+sources) / error")
 def chat_stream(
     req: ChatRequest,
-    user: UserContext = Depends(get_current_user),
+    user: UserContext = Depends(enforce_quota),
     db: Session = Depends(get_db),
 ):
     question = req.question.strip()

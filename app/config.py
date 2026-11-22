@@ -99,6 +99,8 @@ class Settings(BaseSettings):
     # ---- M3 加固 ----
     # 简单限流：每个客户端每分钟最多多少请求；0 = 关闭（默认关，演示不误伤）
     rate_limit_per_min: int = 0
+    # 按租户的日请求配额；0 = 关闭（突发限流仍由 rate_limit_per_min 负责）
+    daily_request_quota: int = 1000
     # 部署在自有反向代理（nginx 等）后面时置 True：限流按 X-Forwarded-For 首跳分桶。
     # 不置 True 则按 TCP 对端 IP —— 反代后面那永远是反代的 IP，所有客户端挤同一个桶。
     # 不无条件信任该头：客户端能自己伪造，等于给"换 IP 绕过限流"开后门。

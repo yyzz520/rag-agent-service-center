@@ -10,13 +10,17 @@
 """
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 from app.api.responses import error, ok
-from app.core.security import UserContext, require_admin
+from app.core.rbac import require_permission
+from app.core.security import UserContext
+from app.db import get_db
 from app.rag.agent_eval import read_agent_reports, run_agent_eval
 from app.rag.diagnosis import run_diagnosis
 from app.rag.eval import read_reports, run_eval
 from app.rag.gen_eval import read_gen_reports, run_gen_eval
+from app.services.audit import record as audit_record
 
 router = APIRouter(prefix="/eval", tags=["评测"])
 
@@ -49,14 +53,15 @@ def _history(runs: list[dict]) -> dict:
 
 
 @router.get("/retrieval", summary="查看检索评测历史（仅管理员）")
-def list_retrieval_runs(_: UserContext = Depends(require_admin)):
+def list_retrieval_runs(_: UserContext = Depends(require_permission("eval:read"))):
     return ok(_history(read_reports()))
 
 
 @router.post("/retrieval", summary="跑一轮检索评测（仅管理员；不调生成模型）")
 def run_retrieval_now(
     req: RetrievalEvalRequest = RetrievalEvalRequest(),
-    _: UserContext = Depends(require_admin),
+    user: UserContext = Depends(require_permission("eval:run")),
+    db: Session = Depends(get_db),
 ):
     overrides = {
         "candidate_pool": req.candidate_pool,
@@ -70,18 +75,20 @@ def run_retrieval_now(
         return error(40001, str(e))
     except Exception as e:
         return error(50001, f"检索评测失败：{e}", status=500)
+    audit_record(db, user, "eval.retrieval", req.note or "", f"total={report['metrics'].get('total')}")
     return ok(report)
 
 
 @router.get("/generation", summary="查看生成评测历史（仅管理员）")
-def list_generation_runs(_: UserContext = Depends(require_admin)):
+def list_generation_runs(_: UserContext = Depends(require_permission("eval:read"))):
     return ok(_history(read_gen_reports()))
 
 
 @router.post("/generation", summary="跑一轮生成评测（仅管理员；真调 LLM）")
 def run_generation_now(
     req: GenerationEvalRequest = GenerationEvalRequest(),
-    _: UserContext = Depends(require_admin),
+    user: UserContext = Depends(require_permission("eval:run")),
+    db: Session = Depends(get_db),
 ):
     try:
         report = run_gen_eval(note=req.note)
@@ -89,18 +96,20 @@ def run_generation_now(
         return error(40001, str(e))
     except Exception as e:
         return error(50001, f"生成评测失败：{e}", status=500)
+    audit_record(db, user, "eval.generation", req.note or "", f"total={report['metrics'].get('total')}")
     return ok(report)
 
 
 @router.get("/agent", summary="查看 Agent 行为评测历史（仅管理员）")
-def list_agent_runs(_: UserContext = Depends(require_admin)):
+def list_agent_runs(_: UserContext = Depends(require_permission("eval:read"))):
     return ok(_history(read_agent_reports()))
 
 
 @router.post("/agent", summary="跑一轮 Agent 行为评测（仅管理员；真调 LLM）")
 def run_agent_now(
     req: AgentEvalRequest = AgentEvalRequest(),
-    _: UserContext = Depends(require_admin),
+    user: UserContext = Depends(require_permission("eval:run")),
+    db: Session = Depends(get_db),
 ):
     try:
         report = run_agent_eval(note=req.note)
@@ -108,11 +117,12 @@ def run_agent_now(
         return error(40001, str(e))
     except Exception as e:
         return error(50001, f"Agent 评测失败：{e}", status=500)
+    audit_record(db, user, "eval.agent", req.note or "", f"tasks={report['metrics'].get('tasks')}")
     return ok(report)
 
 
 @router.get("/summary", summary="三层评测最新指标汇总（仅管理员）")
-def latest_summary(_: UserContext = Depends(require_admin)):
+def latest_summary(_: UserContext = Depends(require_permission("eval:read"))):
     retrieval = read_reports()
     generation = read_gen_reports()
     agent = read_agent_reports()
@@ -124,5 +134,5 @@ def latest_summary(_: UserContext = Depends(require_admin)):
 
 
 @router.get("/diagnosis", summary="对最近一次评测做规则化 badcase 归因（仅管理员）")
-def diagnosis(_: UserContext = Depends(require_admin)):
+def diagnosis(_: UserContext = Depends(require_permission("eval:read"))):
     return ok(run_diagnosis())

@@ -18,9 +18,9 @@ _bearer = HTTPBearer(auto_error=False)
 
 # 内置演示账号：两个普通用户做"多租户隔离"演示，一个 admin 跑全局功能（eval）
 _DEFAULT_USERS = [
-    {"username": "alice", "password": "alice123", "role": "user"},
-    {"username": "bob", "password": "bob123", "role": "user"},
-    {"username": "admin", "password": "admin123", "role": "admin"},
+    {"username": "alice", "password": "alice123", "role": "user", "tenant_id": "tenant-a"},
+    {"username": "bob", "password": "bob123", "role": "user", "tenant_id": "tenant-a"},
+    {"username": "admin", "password": "admin123", "role": "admin", "tenant_id": "tenant-admin"},
 ]
 
 
@@ -28,6 +28,7 @@ class UserContext(BaseModel):
     user_id: str
     username: str
     role: str = "user"
+    tenant_id: str = "default"
 
     @property
     def is_admin(self) -> bool:
@@ -57,6 +58,7 @@ def create_access_token(user: dict) -> str:
         "sub": user["username"],  # env 账号没有独立 id，user_id 就用用户名
         "username": user["username"],
         "role": user.get("role", "user"),
+        "tenant_id": user.get("tenant_id", "default"),
         "iat": now,
         "exp": now + timedelta(minutes=settings.token_expire_minutes),
     }
@@ -69,7 +71,7 @@ def decode_token(token: str) -> dict:
 
 def _local_context() -> UserContext:
     """AUTH_ENABLED=false 的本地兜底身份：等同老 demo 的"全开"；按管理员给，eval 等管理口也能用。"""
-    return UserContext(user_id="demo", username="demo", role="admin")
+    return UserContext(user_id="demo", username="demo", role="admin", tenant_id="tenant-admin")
 
 
 async def get_current_user(
@@ -90,6 +92,7 @@ async def get_current_user(
         user_id=payload["sub"],
         username=payload.get("username", payload["sub"]),
         role=payload.get("role", "user"),
+        tenant_id=payload.get("tenant_id", "default"),
     )
 
 

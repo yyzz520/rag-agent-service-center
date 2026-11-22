@@ -1,0 +1,59 @@
+replicaCount: 2
+
+image:
+  repository: rag-agent-service-center
+  tag: "0.4.4"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8200
+
+ingress:
+  enabled: false
+  className: nginx
+  host: rag-agent.local
+  path: /
+
+# 外部依赖：生产建议用独立 Postgres / Redis / Chroma server
+env:
+  AUTH_ENABLED: "true"
+  DB_URL: "postgresql+psycopg://rag:rag@postgres:5432/rag"
+  CHECKPOINT_BACKEND: "postgres"
+  POSTGRES_DSN: "postgresql://rag:rag@postgres:5432/rag"
+  REDIS_URL: "redis://redis:6379/0"
+  CHROMA_HOST: "chroma"
+  CHROMA_PORT: "8000"
+  DAILY_REQUEST_QUOTA: "1000"
+  RATE_LIMIT_PER_MIN: "60"
+
+# 敏感值优先用 existingSecret；values 里的 secrets 只用于本地临时演示
+existingSecret: ""
+secrets:
+  SILICONFLOW_API_KEY: ""
+  SECRET_KEY: ""
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop: ["ALL"]

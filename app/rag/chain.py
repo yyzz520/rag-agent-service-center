@@ -8,6 +8,7 @@ from functools import lru_cache
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.ai.providers import backup_llm, primary_llm
+from app.rag.guard import sanitize_context
 from app.rag.retrieval import get_rerank_retriever
 from app.rag.trace import chunk_id, current_usage, span
 
@@ -38,7 +39,8 @@ def _format_sources(docs: list) -> tuple[str, list[dict]]:
     context_parts: list[str] = []
     sources: list[dict] = []
     for i, d in enumerate(docs, start=1):
-        context_parts.append(f"[{i}]\n{d.page_content}")
+        # 只过滤进 prompt 的上下文；sources 保留原文，前端溯源仍看到原始内容。
+        context_parts.append(f"[{i}]\n<document>\n{sanitize_context(d.page_content)}\n</document>")
         src = d.metadata.get("source")
         sources.append({
             "id": i,
