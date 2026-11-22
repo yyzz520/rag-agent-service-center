@@ -54,8 +54,8 @@ flowchart TD
 | Skills 市场 | 无 | 工具注册中心 + 版本/权限/上架流程 |
 | Human-in-the-loop | 无 | LangGraph `interrupt` + 审批接口 |
 | 定时调度 | 无 | cron/调度器接入；本项目未接 |
-| Metrics/告警 | 无 Prometheus | 加 `/metrics` 计数/延迟，接告警规则 |
-| K8s | 无 | compose + nginx 已够本项目规模 |
+| Metrics/告警 | 有 `/metrics` + Prometheus/Grafana 配置 | 已提供抓取/告警/看板；未在真实集群验证 |
+| K8s | Helm 清单已提供 | `deploy/helm/rag-agent-service`；未在真实集群验证；compose + nginx 仍是主部署方式 |
 
 ## 4. 边界与扩展
 

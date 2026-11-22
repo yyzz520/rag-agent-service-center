@@ -11,7 +11,7 @@
 | 零依赖（默认） | SQLite 文件 | 进程内 | 嵌入式 Chroma（文件） | 本机一键跑、看功能 |
 | 生产形态 | Postgres | Redis | Chroma server | 单机 compose 复现生产拓扑 |
 
-这里的「生产形态」指组件组合与状态外置方式，**不是生产编排方案**：部署工具仍是 docker compose + nginx（K8s 未做），适合单机部署或每台宿主机各跑一套。
+这里的「生产形态」指组件组合与状态外置方式，**不是生产编排方案**：主部署方式仍是 docker compose + nginx；K8s 清单以 Helm 脚手架提供，未在真实集群验证。适合单机部署或每台宿主机各跑一套。
 
 关系库为什么只有 Postgres、不是 MySQL：会话记忆用的是 LangGraph 官方 checkpointer，**官方只出 sqlite / postgres 两个后端，没有 MySQL saver**。所以生产形态选 Postgres，让会话记忆和应用表统一到一个引擎——少一套中间件、能共用连接配置与备份策略。
 
@@ -242,7 +242,7 @@ curl -X POST http://localhost:8201/api/v1/docs \
 
 ## 数据说明
 
-- `data/`（SQLite + Chroma + trace + 评测报告）、`uploads/`（源文件）默认被 `.gitignore` 忽略，新 clone 需自行上传文档建库。**只有 `data/eval/golden.json`、`golden_generation.json` 和 `agent_tasks.json` 三个评测数据集被放行**，保证 clone 后能直接复跑评测。
+- `data/`（SQLite + Chroma + trace + 评测报告）、`uploads/`（源文件）默认被 `.gitignore` 忽略，新 clone 需自行上传文档建库。**只有 `data/eval/golden.json`、`golden_generation.json`、`agent_tasks.json`、`baseline.json` 四个评测文件被放行**，保证 clone 后能直接复跑评测和门禁。
 - 评测黄金问题集在 `data/eval/golden.json`，`POST /eval/retrieval` 只重放检索、不出答案；同一组题改参重跑后 `GET /eval/retrieval` 逐行对比分数（recall@k / MRR），归因到参数而非生成波动。
 - agent 行为评测任务集在 `data/eval/agent_tasks.json`（路由正确 / 该不该调工具 / 答案是否达标），报告落 `agent_reports.jsonl`。与 RAG 评测最大的不同：**它会真跑 LLM、有花费**，所以只放 8 条固定任务。
 - 评测跑的时候会**整体绕过检索缓存**（`cache.bypass()`）：命中缓存会让分数虚高且不可复现，评测必须打真链路。
