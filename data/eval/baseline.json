@@ -1,0 +1,11 @@
+{
+  "retrieval": {
+    "recall@1": 0.55,
+    "mrr": 0.70
+  },
+  "generation": {
+    "correct_rate": 0.85,
+    "citation_rate": 0.90,
+    "refusal_rate": 0.75
+  }
+}

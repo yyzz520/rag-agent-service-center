@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from app.api.responses import error, ok
 from app.core.security import UserContext, require_admin
 from app.rag.agent_eval import read_agent_reports, run_agent_eval
+from app.rag.diagnosis import run_diagnosis
 from app.rag.eval import read_reports, run_eval
 from app.rag.gen_eval import read_gen_reports, run_gen_eval
 
@@ -120,3 +121,8 @@ def latest_summary(_: UserContext = Depends(require_admin)):
         "generation": generation[-1].get("metrics") if generation else None,
         "agent": agent[-1].get("metrics") if agent else None,
     })
+
+
+@router.get("/diagnosis", summary="对最近一次评测做规则化 badcase 归因（仅管理员）")
+def diagnosis(_: UserContext = Depends(require_admin)):
+    return ok(run_diagnosis())

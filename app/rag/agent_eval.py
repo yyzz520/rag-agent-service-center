@@ -9,6 +9,7 @@
 检索缓存也整体 bypass，保证评测打的是真实链路；工具仍会被真实调用。
 """
 import json
+import re
 import time
 import uuid
 from pathlib import Path
@@ -23,6 +24,8 @@ from app.rag.trace import begin_trace, current_usage, end_trace, rotate_jsonl_if
 EVAL_DIR = Path(settings.persist_dir).parent / "eval"  # data/eval，与 RAG 评测同目录
 TASKS_PATH = EVAL_DIR / "agent_tasks.json"
 REPORTS_PATH = EVAL_DIR / "agent_reports.jsonl"
+
+_REFUSAL_MARKERS = ("没有", "未检索到", "无法", "资料中没有", "没有相关")
 
 
 def load_tasks() -> list[dict]:
@@ -86,6 +89,9 @@ def _run_task(task: dict) -> dict:
         "answer": answer,
         "answer_ok": (task.get("expect_answer_contains") or "") in answer,
         "tokens": (summary or {}).get("total_tokens", 0),
+        "negative": bool(task.get("negative")),
+        "refused": any(marker in answer for marker in _REFUSAL_MARKERS),
+        "cited": bool(re.search(r"\[\d+\]", answer)),
     }
 
 
@@ -93,11 +99,21 @@ def _metrics(results: list[dict]) -> dict:
     total = len(results)
     if not total:
         return {}
+    negative = [r for r in results if r.get("negative")]
+    forbidden = [r for r in results if r.get("forbid_tools")]
     return {
         "tool_route_accuracy": round(sum(r["routed"] for r in results) / total, 3),
         "completion_rate": round(sum(r["answer_ok"] for r in results) / total, 3),
         "avg_tool_steps": round(sum(len(r["tools_used"]) for r in results) / total, 2),
         "avg_tokens": round(sum(r["tokens"] for r in results) / total, 1),
+        "negative_total": len(negative),
+        "negative_refused": sum(1 for r in negative if r.get("refused")),
+        "negative_refusal_rate": round(
+            sum(1 for r in negative if r.get("refused")) / len(negative), 3
+        ) if negative else 0.0,
+        "forbidden_tool_rate": round(
+            sum(1 for r in forbidden if r["tools_used"]) / len(forbidden), 3
+        ) if forbidden else 0.0,
         "tasks": total,
     }
 

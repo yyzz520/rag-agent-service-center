@@ -101,6 +101,7 @@ python3 -m venv .venv
 ```bash
 make install-dev   # 建 .venv 并安装运行 + 测试依赖
 make verify        # ruff + pytest，提交前必跑
+make eval-gate     # 最近一次评测 vs baseline 阈值，低于阈值非 0 退出
 make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
 ```
 
@@ -112,13 +113,14 @@ make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
 |---|---|---|---|
 | RAG 检索 | 61 题 × 9 份合成语料，**只重放检索、不出答案** | 零 LLM 花费 | recall@k / MRR |
 | 生成 | 12 条正样本 + 8 条负样本，**真跑 RAG 生成** | 有花费 | 正确率 / 引用率 / 拒答率 |
-| Agent 行为 | 5 条固定任务，**真跑 LLM** | 有花费 | 路由正确率 / 完成率 / 平均步数 / 平均 token |
+| Agent 行为 | 8 条固定任务（含负样本/禁工具），**真跑 LLM** | 有花费 | 路由正确率 / 完成率 / 步数 / token / 拒答率 / 禁工具调用率 |
 
 同一组题改参数重跑即可逐行对比。实测示例：
 
 - **RAG 检索**：关 rerank 时 recall@1 = 0.59、MRR = 0.775；开 rerank 后都到 1.0。按题型看，扫描件 recall@1 0.333 → 1.0，表格 0.625 → 1.0，单文档 0.6 → 1.0。
 - **生成**：12 条正样本正确率 91.7%、引用率 100%；8 条负样本全部拒答，干净拒答率 87.5%（1 条拒答但仍带引用）。
-- **Agent**：工具路由 1.0、完成率 1.0、平均 1 步、约 2708 token。
+- **Agent**：8 条任务，工具路由 1.0、完成率 1.0、平均 0.88 步、约 3074 token；负样本 3/3 拒答，禁工具任务 0 调用。
+- **诊断/门禁**：`GET /eval/diagnosis` 做规则化 badcase 归因（检索/精排/生成/拒答）；`make eval-gate` 指标低于 baseline 阈值直接非 0 退出。
 
 ![RAG 检索 recall@1 对比](docs/images/eval-recall-at-1.svg)
 

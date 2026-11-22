@@ -1,6 +1,6 @@
 PYTHON ?= .venv/bin/python
 
-.PHONY: venv install install-dev test lint verify run
+.PHONY: venv install install-dev test lint verify eval-gate run
 
 .venv:
 	python3 -m venv .venv
@@ -20,6 +20,9 @@ lint:
 	$(PYTHON) -m ruff check app tests
 
 verify: lint test
+
+eval-gate:
+	$(PYTHON) scripts/eval_gate.py
 
 run:
 	DB_URL='sqlite:///data/app.db' \

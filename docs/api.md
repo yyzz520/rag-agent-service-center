@@ -29,6 +29,7 @@
 | POST | /api/v1/eval/agent | 跑一轮 agent 行为评测（**真跑 LLM、有花费**，任务集见 `data/eval/agent_tasks.json`） |
 | GET | /api/v1/eval/agent | agent 行为评测历史报告（逐轮对比路由正确率/完成率/平均步数/平均 token） |
 | GET | /api/v1/eval/summary | 三层评测最新指标汇总 |
+| GET | /api/v1/eval/diagnosis | 最近一次评测的规则化 badcase 归因（检索/精排/生成/拒答） |
 | GET | /health | 健康检查：chunks / auth_enabled / api_key_ready |
 | GET | /metrics | Prometheus 文本指标：请求计数、延迟 sum/count、uptime（内网抓取） |
 

@@ -9,6 +9,8 @@
 - 生成评测文档与数据集：`docs/evaluation.md`、`data/eval/golden_generation.json`。
 - 工程化骨架：pytest 测试、GitHub Actions CI、Makefile、pyproject、ADR。
 - 逐阶段 trace span（parse / retrieval / generation / tool / agent.run）与 Prometheus `/metrics`。
+- 规则化 badcase 诊断 `/api/v1/eval/diagnosis` 与 `make eval-gate` 评测门禁。
+- Agent 评测扩到 8 条（含负样本/禁工具），增加拒答率与禁工具调用率。
 - Docker 非 root 运行。
 
 ### Changed

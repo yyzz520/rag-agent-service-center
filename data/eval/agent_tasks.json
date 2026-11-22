@@ -22,5 +22,21 @@
   {
     "question": "你好，用一句话介绍你自己就行。",
     "forbid_tools": true
+  },
+  {
+    "question": "清源缓释片的儿童推荐剂量是多少？",
+    "expect_answer_contains": "没有",
+    "negative": true
+  },
+  {
+    "question": "公司 2025 年的净利润是多少？",
+    "doc": "f7ddd566230843b4ba30ba33fccbb333",
+    "expect_answer_contains": "没有",
+    "negative": true
+  },
+  {
+    "question": "公司的 GMP 证书有效期到哪一天？",
+    "expect_answer_contains": "没有",
+    "negative": true
   }
 ]
