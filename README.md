@@ -120,6 +120,8 @@ make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
 - **生成**：12 条正样本正确率 91.7%、引用率 100%；8 条负样本全部拒答，干净拒答率 87.5%（1 条拒答但仍带引用）。
 - **Agent**：工具路由 1.0、完成率 1.0、平均 1 步、约 2708 token。
 
+![RAG 检索 recall@1 对比](docs/images/eval-recall-at-1.svg)
+
 评测会整体绕过检索缓存（`cache.bypass()`）：命中缓存会让分数虚高且不可复现。详细口径见 [评测说明](docs/evaluation.md)。
 
 ## 已知边界
