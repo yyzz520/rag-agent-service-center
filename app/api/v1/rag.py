@@ -23,7 +23,7 @@ from app.rag.gen_eval import read_gen_reports, run_gen_eval
 from app.rag.refusal import finalize
 from app.rag.trace import begin_trace, current_usage, end_trace, log_answer, read_trace
 from app.rag.vector_store import get_vectorstore
-from app.services.access import owned_doc, owned_doc_ids
+from app.services.access import visible_doc, visible_doc_ids
 
 router = APIRouter(prefix="/rag", tags=["知识库 RAG"])
 
@@ -74,11 +74,11 @@ def _resolve_scope_or_error(
 ) -> tuple[list[str] | None, object | None]:
     """返回 (allowed_doc_ids, None) 或 (None, error 响应)。None 只在"doc 归属失败"时出现。"""
     if doc_id:
-        doc = owned_doc(db, user.user_id, doc_id)
+        doc = visible_doc(db, user, doc_id)
         if doc is None:
             return None, error(40002, "文档不存在或无权访问")
         return [doc.id], None
-    return owned_doc_ids(db, user.user_id), None
+    return visible_doc_ids(db, user), None
 
 
 @router.post("/chat", summary="RAG 知识库问答（带溯源，仅限本人文档）")

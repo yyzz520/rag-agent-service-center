@@ -29,6 +29,10 @@ class UserContext(BaseModel):
     username: str
     role: str = "user"
     tenant_id: str = "default"
+    # 纵向隔离（配置驱动）：组织路径用 "/" 分层（如 hq/tech/rag），空 = 只看自己的文档；
+    # level 是职级/密级，只能看到职级不高于自己的下属机构文档。admin 不受限。
+    org_id: str = ""
+    level: int = 1
 
     @property
     def is_admin(self) -> bool:
@@ -59,6 +63,8 @@ def create_access_token(user: dict) -> str:
         "username": user["username"],
         "role": user.get("role", "user"),
         "tenant_id": user.get("tenant_id", "default"),
+        "org_id": user.get("org_id", ""),
+        "level": int(user.get("level", 1)),
         "iat": now,
         "exp": now + timedelta(minutes=settings.token_expire_minutes),
     }
@@ -71,7 +77,10 @@ def decode_token(token: str) -> dict:
 
 def _local_context() -> UserContext:
     """AUTH_ENABLED=false 的本地兜底身份：等同旧版本的"全开"；按管理员给，eval 等管理口也能用。"""
-    return UserContext(user_id="local", username="local", role="admin", tenant_id="tenant-admin")
+    return UserContext(
+        user_id="local", username="local", role="admin",
+        tenant_id="tenant-admin", org_id="", level=99,
+    )
 
 
 async def get_current_user(
@@ -88,11 +97,17 @@ async def get_current_user(
         payload = decode_token(credentials.credentials)
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="token 无效或已过期，请重新登录")
+    try:
+        level = int(payload.get("level", 1))
+    except (TypeError, ValueError):
+        level = 1
     return UserContext(
         user_id=payload["sub"],
         username=payload.get("username", payload["sub"]),
         role=payload.get("role", "user"),
         tenant_id=payload.get("tenant_id", "default"),
+        org_id=payload.get("org_id", ""),
+        level=level,
     )
 
 

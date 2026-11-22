@@ -37,7 +37,7 @@ from app.core.token_budget import check as check_tokens
 from app.db import get_db
 from app.models import Session as ChatSession
 from app.rag.trace import begin_trace, current_usage, end_trace, log_answer, span
-from app.services.access import owned_doc, owned_doc_ids
+from app.services.access import visible_doc, visible_doc_ids
 from app.services.audit import record as audit_record
 
 router = APIRouter(prefix="/agent", tags=["智能体 Agent"])
@@ -94,11 +94,11 @@ def _resolve_scope(
 ) -> tuple[list[str] | None, object | None]:
     """把 doc 参数收窄成"本人可检索文档 uuid 列表"：指定的必须属本人，否则 40002。"""
     if doc_id:
-        doc = owned_doc(db, user.user_id, doc_id)
+        doc = visible_doc(db, user, doc_id)
         if doc is None:
             return None, error(40002, "文档不存在或无权访问")
         return [doc.id], None
-    return owned_doc_ids(db, user.user_id), None
+    return visible_doc_ids(db, user), None
 
 
 def _agent_config(conversation_id: str) -> dict:

@@ -29,6 +29,8 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         username=user["username"],
         role=user.get("role", "user"),
         tenant_id=user.get("tenant_id", "default"),
+        org_id=user.get("org_id", ""),
+        level=int(user.get("level", 1)),
     )
     audit_record(db, user_ctx, "auth.login", user["username"])
     return ok({
@@ -38,5 +40,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
             "username": user["username"],
             "role": user.get("role", "user"),
             "tenant_id": user_ctx.tenant_id,
+            "org_id": user_ctx.org_id,
+            "level": user_ctx.level,
         },
     })

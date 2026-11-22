@@ -26,7 +26,7 @@
 |---|---|
 | **检索** | 结构感知父子块切分（标题/章节/表格，子块检索、父块补上下文）→ 查询改写 → 向量 + BM25 混合 → RRF 融合 → Rerank 精排 → 带 `[n]` 引用作答 |
 | **Agent Harness** | LangGraph ReAct：工具注册、checkpointer 记忆、业务级四道熔断（步数/重复/耗时/token）、工具防重、超时、单轮上下文预算（超长工具结果外置）、危险工具执行幂等、外部工具人工审批（HITL）、MCP 外部工具；能力边界见 [Harness 层](docs/harness.md) |
-| **多租户** | 分块打 `doc_id/user_id/kb_id`，检索按本人文档在 Chroma / BM25 双路收窄；租户日请求配额 + 可选日 token 预算 |
+| **多租户** | 横向：分块打 `doc_id/user_id/kb_id`，检索按可见文档在 Chroma / BM25 双路收窄；可选纵向：组织路径 + 职级决定查看范围（编辑/删除仍限本人）；租户日请求配额 + 可选日 token 预算 |
 | **多副本** | 限流 / 会话记忆 / 向量库 / 缓存全部外置，`--scale app=N` 后请求落到任何副本都正确 |
 | **评测** | RAG 检索评测（recall@k / MRR，零 LLM 花费）+ agent 行为评测（真跑 LLM） |
 | **可观测** | 每问落 trace，带 token / 工具调用 / 步数记账；逐阶段 span（解析/检索/生成/工具）；`GET /metrics` 暴露 Prometheus 请求计数/延迟/uptime |
