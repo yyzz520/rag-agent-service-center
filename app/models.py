@@ -1,7 +1,7 @@
 """元数据三表：kb / doc / chat_session。向量块本身在 Chroma，这里只放关系型元数据。
 
-设计照改造计划 6.3：
-- doc_id 是 chat 的 doc 参数 / 向量块 metadata 里的稳定主键（uuid，替代旧 demo 的路径哈希）
+设计要点：
+- doc_id 是 chat 的 doc 参数 / 向量块 metadata 里的稳定主键（uuid，替代旧版本的路径哈希）
 - session.id = conversation_id（与 LangGraph checkpointer 的 thread_id 同值）
 """
 import uuid

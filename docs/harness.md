@@ -50,19 +50,17 @@ flowchart TD
 | 新护栏 | recursion_limit / 防重 / 超时 | 在 agent 调用或工具层包一层 |
 | 新评测 | 三层固定集 | 加数据集 + runner + `/eval` 路由 |
 | 沙箱 | 无 | 把工具执行放容器/microVM；当前工具是可信代码 |
-| 子智能体路由 | 无 | LangGraph 子图 + router 节点；公司 Bisheng 平台已有 |
+| 子智能体路由 | 无 | LangGraph 子图 + router 节点；本项目未接 |
 | Skills 市场 | 无 | 工具注册中心 + 版本/权限/上架流程 |
 | Human-in-the-loop | 无 | LangGraph `interrupt` + 审批接口 |
-| 定时调度 | 无 | 公司 Bisheng 有定时任务；demo 未接 |
+| 定时调度 | 无 | cron/调度器接入；本项目未接 |
 | Metrics/告警 | 无 Prometheus | 加 `/metrics` 计数/延迟，接告警规则 |
 | K8s | 无 | compose + nginx 已够本项目规模 |
 
-## 4. 和公司 Bisheng 的关系
+## 4. 边界与扩展
 
-公司 Bisheng 定制分支里有更完整的 Harness/子智能体、纳管智能体、定时任务能力，那是平台层。  
-我的角色是 AI 工具子模块 + 评测监控：理解 Harness 的调度/工具/记忆/护栏机制，把业务工具接进去，并用三层评测证明它有效。  
-**不把平台层说成个人产出，也不把 demo 说成完整平台。**
+本项目是**个人服务层技术验证**，不覆盖平台层：多租户平台管理、工作流画布、Skills 市场、沙箱、HITL、子智能体编排不在范围，作为后续扩展方向。
 
-## 5. 面试一句话
+## 5. 一句话
 
-> 有 Harness 层，但要分清平台和 demo：公司 Bisheng 有完整 Harness/子智能体/纳管/定时任务，平台团队在做；我负责 AI 工具和评测监控。我自己按生产级思路做了最小 Harness：ReAct 循环、工具注册、checkpointer 记忆、步数闸/工具防重/超时/fallback、MCP、trace/usage、多副本。没有沙箱、子智能体编排、Skills 市场、HITL——这些是边界，不是遗漏。
+> 这是一个最小生产级 Agent Harness：ReAct 循环、工具注册、checkpointer 记忆、步数闸/工具防重/超时/fallback、MCP、trace/usage、多副本；平台层能力不在本项目范围。

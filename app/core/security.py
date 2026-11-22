@@ -1,8 +1,8 @@
 """JWT 自签自验 + 登录账号（env 配）+ 当前用户依赖。
 
-架构口径（改造计划决策3）：公司是网关验签、服务读 user_id；本项目不依赖公司网关，
-自己签/验 token，sub=user_id。将来进网关时把"验签"这一层换成网关透传即可，结构等价。
-演示账号放 env（内存只读），不建 users 表——账号不是本 demo 要展示的业务。
+架构口径：生产网关可以在外层验签、服务只读 user_id；本项目不依赖外部网关，
+自己签/验 token，sub=user_id。接入网关时把"验签"这一层换成网关透传即可，结构等价。
+内置账号放 env（内存只读），不建 users 表——账号不是本项目要展示的业务。
 """
 import json
 from datetime import datetime, timedelta, timezone
@@ -16,7 +16,7 @@ from app.config import settings
 
 _bearer = HTTPBearer(auto_error=False)
 
-# 内置演示账号：两个普通用户做"多租户隔离"演示，一个 admin 跑全局功能（eval）
+# 内置账号：两个普通用户做"多租户隔离"演示，一个 admin 跑全局功能（eval）
 _DEFAULT_USERS = [
     {"username": "alice", "password": "alice123", "role": "user", "tenant_id": "tenant-a"},
     {"username": "bob", "password": "bob123", "role": "user", "tenant_id": "tenant-a"},
@@ -70,8 +70,8 @@ def decode_token(token: str) -> dict:
 
 
 def _local_context() -> UserContext:
-    """AUTH_ENABLED=false 的本地兜底身份：等同老 demo 的"全开"；按管理员给，eval 等管理口也能用。"""
-    return UserContext(user_id="demo", username="demo", role="admin", tenant_id="tenant-admin")
+    """AUTH_ENABLED=false 的本地兜底身份：等同旧版本的"全开"；按管理员给，eval 等管理口也能用。"""
+    return UserContext(user_id="local", username="local", role="admin", tenant_id="tenant-admin")
 
 
 async def get_current_user(

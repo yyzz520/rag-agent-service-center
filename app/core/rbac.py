@@ -1,6 +1,6 @@
 """最小 RBAC：角色 → 权限；管理接口用 require_permission 收口。
 
-demo 只有 admin/user 两个角色，但接口按权限点命名，后续加角色/权限不用改路由。
+本项目只有 admin/user 两个角色，但接口按权限点命名，后续加角色/权限不用改路由。
 """
 from fastapi import Depends, HTTPException
 

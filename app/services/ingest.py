@@ -1,6 +1,6 @@
 """文档入库：存文件 → 切块打元数据 → 写向量 → doc 状态落库。
 
-load_document / get_splitter 即改造计划里"可插拔解析引擎"的 builtin 主路径；
+load_document / get_splitter 是可插拔解析引擎的 builtin 主路径；
 M2 加 mineru_cloud / mineru_remote 时只换这里，不进路由层。
 后台任务解析不需要 user 上下文：doc 行已存 owner，worker 按 doc_id 取数即可（6.4）。
 """

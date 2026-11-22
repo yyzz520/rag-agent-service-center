@@ -247,7 +247,7 @@ curl -X POST http://localhost:8201/api/v1/docs \
 - agent 行为评测任务集在 `data/eval/agent_tasks.json`（路由正确 / 该不该调工具 / 答案是否达标），报告落 `agent_reports.jsonl`。与 RAG 评测最大的不同：**它会真跑 LLM、有花费**，所以只放 8 条固定任务。
 - 评测跑的时候会**整体绕过检索缓存**（`cache.bypass()`）：命中缓存会让分数虚高且不可复现，评测必须打真链路。
 - `data/trace/trace.jsonl` 每问一条 answer 记录，带 `usage` 字段（`model_calls`/`tool_calls`/`prompt_tokens`/`completion_tokens`/`total_tokens`）——每 run LLM 消耗记账，`GET /rag/trace`（管理员）可查。
-- 元数据 schema 变更后旧向量块会不可见（无 user 归属标签），demo 语料可整体重建后再跑评测。
+- 元数据 schema 变更后旧向量块会不可见（无 user 归属标签），示例语料可整体重建后再跑评测。
 
 ## 两处容易踩的坑
 

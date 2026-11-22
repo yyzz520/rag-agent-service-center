@@ -15,7 +15,7 @@ class RateLimiter:
     限流形同虚设。Redis 的 INCR 是全局原子的，所有副本累加同一个 key。
 
     窗口按固定时长切 bucket（key 带 bucket 号），INCR + EXPIRE 一步到位；代价是窗口边界
-    处理论可翻倍突发（tumbling window 的固有属性），演示量级够用，要精确可换滑动窗口 zset。
+    处理论可翻倍突发（tumbling window 的固有属性），当前量级够用，要精确可换滑动窗口 zset。
 
     Redis 不可用时退回进程内实现——宁可弱限流（只本进程有效）也不给用户 500，
     并在日志里点明"多副本下限流会被放大"。隔 _RETRY_COOLDOWN 秒再重试 Redis。
