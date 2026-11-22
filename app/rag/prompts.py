@@ -44,6 +44,28 @@ JUDGE = Prompt(
 """,
 )
 
+PLAN = Prompt(
+    version="plan.v1",
+    text=(
+        "你是任务规划器。把用户问题拆成 1-{max_steps} 个可执行步骤，每步只能调用下面工具之一。\n"
+        "可用工具：\n{tools}\n\n"
+        "只输出 JSON，不要 markdown：\n"
+        '{{"steps":[{{"goal":"这一步要拿到什么","tool":"工具名","args":{{"参数":"值"}}}}]}}\n'
+        "规则：步骤必须能由工具独立完成；参数必须是工具要求的参数；不要规划“写报告”这类没有工具能完成的步骤；"
+        "没有把握就少拆步骤；不要重复同一步骤。\n"
+        "问题：{question}"
+    ),
+)
+
+PLAN_SYNTH = Prompt(
+    version="plan_synth.v1",
+    text=(
+        "你是回答合成器。只依据下面的执行结果回答用户问题；结果不足就如实说明缺什么，不要编造。\n\n"
+        "问题：{question}\n\n执行结果：\n{results}\n\n"
+        "直接给出最终答案，必要时列出关键依据。"
+    ),
+)
+
 AGENT = Prompt(
     version="agent.v1",
     text=(
@@ -61,6 +83,8 @@ REGISTRY = {
     "rewrite": REWRITE,
     "judge": JUDGE,
     "agent": AGENT,
+    "plan": PLAN,
+    "plan_synth": PLAN_SYNTH,
 }
 
 

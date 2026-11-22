@@ -19,7 +19,10 @@
 | POST | /api/v1/rag/chat | RAG 问答（带 `[n]` 溯源，返回 sources）。body: `question`、`doc`（doc_id，限定单文档；留空 = 本人全库） |
 | POST | /api/v1/rag/chat/stream | RAG 流式（SSE）：`meta` → `content`(逐字) → `done`(答案+sources)；异常 → `error` |
 | POST | /api/v1/agent/chat | 智能体对话（可调工具：知识库检索/计算器/外部 MCP 工具）。body: `question`、`conversation_id`(续传记忆，不带=新会话)、`doc`(限定检索文档) |
-| POST | /api/v1/agent/chat/stream | 智能体流式（SSE）：`meta` → 可交错 `tool_start`/`content`/`tool_end` → `done`(答案+tools) |
+| POST | /api/v1/agent/chat/stream | 智能体流式（SSE）：`meta`(含 route) → 可交错 `tool_start`/`content`/`tool_end` → `done`(答案+tools)；需审批时 `awaiting_approval` |
+| POST | /api/v1/agent/approve | 工具审批：批准/拒绝/改参数后从 checkpoint 续跑（body: `conversation_id`、`decisions[]`） |
+| POST | /api/v1/agent/plan | Plan-and-Execute：先生成计划并暂停等人审批（返回 `awaiting_plan_approval` + steps） |
+| POST | /api/v1/agent/plan/approve | 计划审批：`approve` / `reject` / `edit`（带 `steps`）后按步执行并合成答案 |
 | GET | /api/v1/sessions | 我的会话列表（conversation_id 给 agent 续传） |
 | DELETE | /api/v1/sessions/{session_id} | 删会话：记录 + 会话记忆一起清 |
 | POST | /api/v1/eval/retrieval | 跑 RAG 检索评测（**只重放检索、不出答案**，所以无 LLM 花费）。body: 可传检索参数覆盖 |

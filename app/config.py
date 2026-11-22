@@ -107,6 +107,9 @@ class Settings(BaseSettings):
     # 和请求配额互补：配额防"次数"，这里防"单次长会话烧太多"。
     tenant_daily_token_budget: int = 0
 
+    # Plan-and-Execute：计划最多几步（一次计划审批覆盖全部步骤）。
+    agent_plan_max_steps: int = 6
+
     # ---- 外部 MCP 工具（M5）----
     # 空 = 不接外部工具（默认，保证零配置能跑）。填 JSON 才启用，形如：
     #   {"wms":{"command":"python","args":["-m","mcp_servers.wms_server"],"transport":"stdio"}}

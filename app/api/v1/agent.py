@@ -17,6 +17,7 @@ from app.agent.approval import (
     reject_decisions,
 )
 from app.agent.guard import AgentRunLimitError
+from app.agent.router import classify
 from app.agent.graph import (
     amaybe_compress_thread,
     build_agent,
@@ -176,6 +177,7 @@ def _invoke_agent(
     replay: bool = False,
     replay_check: bool = False,
     on_expired=None,
+    route: str | None = None,
 ) -> tuple[str, list[str]]:
     """跑一轮对话，返回 (answer, tools_used)。llm 默认主供应商；fallback 时传备份 LLM。
 
@@ -188,7 +190,8 @@ def _invoke_agent(
         if replay_check and not replay:
             replay = _thread_has_pending_question(saver, conversation_id, question)
         agent = build_agent(
-            allowed_doc_ids, checkpointer=saver, llm=llm, conversation_id=conversation_id
+            allowed_doc_ids, checkpointer=saver, llm=llm,
+            conversation_id=conversation_id, route=route,
         )
         # 长会话压缩（37）：新的一轮开始前若线程历史超阈值，先把更早消息折成摘要（replay 不重复压）
         if not replay:
@@ -262,12 +265,15 @@ def agent_chat(
     berr = _token_budget_error(user)
     if berr is not None:
         return berr
+    route = classify(question)
     token = begin_trace(source="agent", conversation_id=conversation_id)
     try:
+        with span("router", route=route.route, reason=route.reason):
+            pass
         on_expired = _expired_auditor(db, user)
         try:
             answer, tools_used = _invoke_agent(
-                allowed, conversation_id, question, on_expired=on_expired
+                allowed, conversation_id, question, on_expired=on_expired, route=route.route
             )
         except (AgentRunLimitError, AgentAwaitingApproval):
             raise  # 护栏熔断/等待审批不是供应商故障，不能 fallback 重试
@@ -284,6 +290,7 @@ def agent_chat(
                 llm=backup,
                 replay_check=True,
                 on_expired=on_expired,
+                route=route.route,
             )
         log_answer(question, answer)
         session_row.last_active_at = _now_utc()
@@ -292,6 +299,7 @@ def agent_chat(
             "conversation_id": conversation_id,
             "doc": req.doc,
             "question": question,
+            "route": route.route,
             "answer": answer,
             "tools": tools_used,
         })
@@ -301,6 +309,7 @@ def agent_chat(
         return ok({
             "conversation_id": conversation_id,
             "question": question,
+            "route": route.route,
             "status": "awaiting_approval",
             "pending": e.payload.get("pending", []),
             "expires_in": e.payload.get("expires_in"),
@@ -332,11 +341,13 @@ def agent_chat_stream(
     berr = _token_budget_error(user)
     if berr is not None:
         return berr
+    route = classify(question)
     trace_id = uuid.uuid4().hex[:12]
     return StreamingResponse(
         _agent_stream(
             question, allowed, conversation_id, session_row, db, trace_id,
             tenant_id=user.tenant_id,
+            route=route.route,
             on_expired=_expired_auditor(db, user),
         ),
         media_type="text/event-stream",
@@ -355,6 +366,7 @@ async def _run_agent_turn(
     llm=None,
     replay: bool = False,
     on_expired=None,
+    route: str | None = None,
 ):
     """把一轮 astream（模型↔工具多步）解包成 content/tool_start/tool_end 事件。
 
@@ -363,7 +375,8 @@ async def _run_agent_turn(
     replay=True：不重复塞 human，续跑线程里已 checkpoint 的模型节点（fallback 用，见下方重试）。
     """
     agent = build_agent(
-        allowed_doc_ids, checkpointer=saver, llm=llm, conversation_id=conversation_id
+        allowed_doc_ids, checkpointer=saver, llm=llm,
+        conversation_id=conversation_id, route=route,
     )
     config = _agent_config(conversation_id)
     if not replay:
@@ -450,11 +463,16 @@ async def _agent_stream(
     db: Session,
     trace_id: str,
     tenant_id: str,
+    route: str | None = None,
     on_expired=None,
 ):
     token = begin_trace(source="agent", conversation_id=conversation_id, trace_id=trace_id)
     try:
-        yield sse_event("meta", {"conversation_id": conversation_id, "trace_id": trace_id})
+        yield sse_event("meta", {
+            "conversation_id": conversation_id, "trace_id": trace_id, "route": route,
+        })
+        with span("router", route=route):
+            pass
         answer_buf: list[str] = []
         tools_used: list[str] = []
         state_out: dict = {}
@@ -464,7 +482,7 @@ async def _agent_stream(
             try:
                 async for ev in _run_agent_turn(
                     saver, allowed_doc_ids, conversation_id, question, answer_buf,
-                    tools_used, state_out, on_expired=on_expired,
+                    tools_used, state_out, on_expired=on_expired, route=route,
                 ):
                     delivered = True
                     yield ev
@@ -491,6 +509,7 @@ async def _agent_stream(
                     llm=backup,
                     replay=True,
                     on_expired=on_expired,
+                    route=route,
                 ):
                     yield ev
         if state_out.get("interrupted"):
@@ -507,7 +526,7 @@ async def _agent_stream(
         log_answer(question, answer)
         session_row.last_active_at = _now_utc()
         db.commit()
-        yield sse_event("done", {"answer": answer, "tools": tools_used})
+        yield sse_event("done", {"answer": answer, "tools": tools_used, "route": route})
     except AgentRunLimitError as e:
         yield sse_event("error", {"message": f"运行超限：{e}", "code": 42901})
     except Exception as e:

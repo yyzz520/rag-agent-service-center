@@ -10,10 +10,10 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.prebuilt import create_react_agent
 
+from app.agent import toolkit
 from app.agent.approval import make_approval_hook
 from app.agent.guard import make_pre_model_hook
-from app.agent.mcp_tools import get_mcp_tools
-from app.agent.tools import calculator, make_search_knowledge_base_tool
+from app.agent.router import route_suffix
 from app.ai.providers import backup_llm, primary_llm
 from app.config import settings
 from app.rag.prompts import get_prompt
@@ -106,9 +106,9 @@ def init_checkpointer() -> None:
 _AGENT_SYSTEM = get_prompt("agent").text
 
 
-def _scope_tools(allowed_doc_ids: list[str] | None):
-    # 外部 MCP 工具（配置了才非空）追加在末尾：本地工具恒定存在，模型先看到"确定有"的能力
-    return [make_search_knowledge_base_tool(allowed_doc_ids), calculator, *get_mcp_tools()]
+def _scope_tools(allowed_doc_ids: list[str] | None, route: str | None = None):
+    # 路由只决定"看哪些工具"；检索范围仍由 allowed_doc_ids 闭包绑定
+    return toolkit.tools_for_route(allowed_doc_ids, route)
 
 
 def build_agent(
@@ -117,6 +117,7 @@ def build_agent(
     checkpointer=None,
     llm=None,
     conversation_id: str | None = None,
+    route: str | None = None,
 ):
     """按请求作用域现拼一个 agent（每请求一个，工具闭包绑定 allowed_doc_ids，隔离不靠 ContextVar）。
 
@@ -135,8 +136,8 @@ def build_agent(
     scope = conversation_id or current_trace_id() or "no-scope"
     return create_react_agent(
         llm or get_agent_llm(),
-        _scope_tools(allowed_doc_ids),
-        prompt=_AGENT_SYSTEM,
+        _scope_tools(allowed_doc_ids, route),
+        prompt=_AGENT_SYSTEM + route_suffix(route),
         checkpointer=checkpointer,
         # 每次模型调用前：业务级熔断 + 上下文预算；模型产出工具调用后、执行前：人工审批。
         # 都在 harness 层，工具实现本身不感知。

@@ -26,6 +26,8 @@ flowchart TD
 | 成本治理 | 租户日 token 预算（Redis / 进程内回退） | 请求前 check、结束后按 `usage.total_tokens` 记账；预算 0=关闭，超预算返回 429 |
 | 失败路径验证 | 故障注入 + 跨租户对抗测试 | LLM 失败不伪造答案、MCP 超时、台账不可用 fail-closed、上下文落盘失败降级截断；检索双路按 `doc_id` 兜底过滤、缓存 key 按文档范围、父块跨文档拒绝 |
 | 人工审批（HITL） | `post_model_hook` + `interrupt()` | 模型产出 tool_calls 后、执行前暂停；`/agent/approve` 批准/拒绝/改参数后从 checkpoint 续跑；超时/缺失审批 fail-closed；决策落审计日志。**超时惰性兜底**：挂起超过 `AGENT_APPROVAL_TIMEOUT` 秒后，下一次问新问题或审批会自动按拒绝恢复；挂起本身不占连接，只在 checkpointer 里留状态 |
+| 意图路由 | 规则分类 `rag/tool/chat` | 按路由选工具集与提示词；记 route/reason 到 trace；没接外部工具时 tool 自动退回 rag，避免路由到空工具集 |
+| 计划执行 | Plan-and-Execute 子图 | 计划生成（含工具参数 JSON Schema）→ `interrupt` 审批（可改参数/拒绝）→ 逐步执行 → 合成答案；独立 thread、步数上限；**不自动 replan** |
 | 工具注册 | LangChain `@tool` + MCP | 工具名/描述/参数给模型；检索工具按请求闭包绑定文档范围 |
 | 工具防重 | 检索工具内 `seen` dict | 同一轮重复 query 复用上次结果；计算器故意不做（纯函数、零副作用） |
 | 记忆 | LangGraph checkpointer | `thread_id=conversation_id`；sqlite 本地 / Postgres 多副本；超长会话压缩；也是 HITL 暂停/恢复的载体 |
@@ -56,7 +58,7 @@ flowchart TD
 | 新护栏 | 业务熔断 4 道 + 防重 + 超时 | 改 pre_model_hook 或工具层包装；阈值走配置 |
 | 新评测 | 三层固定集 | 加数据集 + runner + `/eval` 路由 |
 | 沙箱 | 无 | 把工具执行放容器/microVM；当前工具是可信代码 |
-| 子智能体路由 | 无 | LangGraph 子图 + router 节点；本项目未接 |
+| 多智能体协作 | 无（只有单层意图路由 + Plan-and-Execute） | 子图动态派发 + supervisor；本项目刻意不做自由协作 |
 | Skills 市场 | 无 | 工具注册中心 + 版本/权限/上架流程 |
 | Human-in-the-loop | 工具级审批：外部/未知工具执行前暂停，`/agent/approve` 续跑（超时 fail-closed、审计落库） | 平台级审批流（多人会签、审批中心对接）未做；本地只读工具自动放行 |
 | 定时调度 | 无 | cron/调度器接入；本项目未接 |

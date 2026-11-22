@@ -2,7 +2,9 @@ from app.rag import prompts
 
 
 def test_registry_has_all_prompts_with_versions():
-    assert set(prompts.versions()) == {"citation", "rewrite", "judge", "agent"}
+    assert set(prompts.versions()) == {
+        "citation", "rewrite", "judge", "agent", "plan", "plan_synth",
+    }
     for name, version in prompts.versions().items():
         assert version and prompts.get_prompt(name).text
         assert name in version
