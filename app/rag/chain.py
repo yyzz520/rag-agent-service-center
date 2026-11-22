@@ -9,7 +9,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from app.ai.providers import backup_llm, primary_llm
 from app.rag.retrieval import get_rerank_retriever
-from app.rag.trace import chunk_id, current_usage
+from app.rag.trace import chunk_id, current_usage, span
 
 _ANSWER_TEMPERATURE = 0.1
 
@@ -67,7 +67,8 @@ def retrieve_context(
     question: str, allowed_doc_ids: list[str] | None = None
 ) -> dict | None:
     """只做检索，返回 {"context", "sources"}；无命中返回 None。流式与一次性共用这一份检索逻辑。"""
-    docs = get_rerank_retriever(allowed_doc_ids=allowed_doc_ids).invoke(question)
+    with span("retrieval", question_len=len(question)):
+        docs = get_rerank_retriever(allowed_doc_ids=allowed_doc_ids).invoke(question)
     if not docs:
         return None
     context, sources = _format_sources(docs)
@@ -85,9 +86,10 @@ def run_rag(
     ctx = retrieve_context(question, allowed_doc_ids)
     if ctx is None:
         return {"answer": "资料中没有相关内容，无法回答。", "sources": []}
-    msg = make_answer_chain(llm).invoke(
-        {"context": ctx["context"], "question": question}
-    )
+    with span("generation"):
+        msg = make_answer_chain(llm).invoke(
+            {"context": ctx["context"], "question": question}
+        )
     rec = current_usage()
     if rec is not None:
         rec.record(msg)

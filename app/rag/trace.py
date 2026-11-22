@@ -9,6 +9,7 @@ import hashlib
 import json
 import time
 import uuid
+from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from pathlib import Path
 
@@ -42,6 +43,35 @@ def begin_trace(
 
 def end_trace(token: Token) -> None:
     _trace_ctx.reset(token)
+
+
+def current_trace_id() -> str | None:
+    """当前上下文的 trace_id（无上下文返回 None），供闭包/线程池场景显式携带。"""
+    ctx = _trace_ctx.get()
+    return ctx["trace_id"] if ctx else None
+
+
+@contextmanager
+def span(name: str, **attrs):
+    """记录一个阶段耗时（kind=span）到 trace.jsonl。
+
+    没有 trace 上下文时 trace_id 为 null（例如后台解析），仍然保留耗时；有上下文时
+    同一轮的所有 span 共享 trace_id，可和 retrieval/answer 记录对齐。
+    """
+    start = time.perf_counter()
+    try:
+        yield
+    finally:
+        try:
+            _append({
+                "ts": time.time(),
+                "kind": "span",
+                "name": name,
+                "ms": round((time.perf_counter() - start) * 1000, 1),
+                **attrs,
+            })
+        except Exception:
+            pass
 
 
 def current_usage() -> UsageRecorder | None:

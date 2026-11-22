@@ -25,7 +25,7 @@ from app.config import settings
 from app.core.security import UserContext, get_current_user
 from app.db import get_db
 from app.models import Session as ChatSession
-from app.rag.trace import begin_trace, current_usage, end_trace, log_answer
+from app.rag.trace import begin_trace, current_usage, end_trace, log_answer, span
 from app.services.access import owned_doc, owned_doc_ids
 
 router = APIRouter(prefix="/agent", tags=["智能体 Agent"])
@@ -124,7 +124,8 @@ def _invoke_agent(
         snap = agent.get_state(config)
         prior_len = len(list((snap.values or {}).get("messages") or []))
         inputs = {} if replay else {"messages": [HumanMessage(content=question)]}
-        result = agent.invoke(inputs, config=config)
+        with span("agent.run"):
+            result = agent.invoke(inputs, config=config)
         messages = result["messages"]
         answer = messages[-1].content
         new_msgs = messages[prior_len:]

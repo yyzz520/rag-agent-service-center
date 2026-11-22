@@ -1,6 +1,7 @@
 from langchain_core.tools import tool
 
 from app.rag.retrieval import get_rerank_retriever
+from app.rag.trace import current_trace_id, span
 
 
 def make_search_knowledge_base_tool(allowed_doc_ids: list[str] | None):
@@ -17,6 +18,9 @@ def make_search_knowledge_base_tool(allowed_doc_ids: list[str] | None):
     """
 
     seen: dict[str, str] = {}
+    # 工具可能在 LangGraph 的线程池里执行，ContextVar 会丢；造工具时把 trace_id 闭包进去，
+    # span 里显式带上，保证工具耗时还能和本轮 trace 对齐。
+    trace_id = current_trace_id()
 
     @tool("search_knowledge_base")
     def search_knowledge_base(query: str) -> str:
@@ -24,7 +28,8 @@ def make_search_knowledge_base_tool(allowed_doc_ids: list[str] | None):
         key = query.strip()
         if key in seen:
             return f"（重复查询，复用上次结果）\n{seen[key]}"
-        docs = get_rerank_retriever(allowed_doc_ids=allowed_doc_ids).invoke(query)
+        with span("tool.search_knowledge_base", trace_id=trace_id, query_len=len(query)):
+            docs = get_rerank_retriever(allowed_doc_ids=allowed_doc_ids).invoke(query)
         result = "\n\n---\n\n".join(d.page_content for d in docs) if docs else "知识库中没有检索到相关内容。"
         seen[key] = result
         return result

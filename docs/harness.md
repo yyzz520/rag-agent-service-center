@@ -13,7 +13,7 @@ flowchart TD
   L --> T[工具层<br/>知识库检索 / 计算器 / MCP]
   L --> M[记忆层<br/>checkpointer + thread_id]
   L --> G[护栏<br/>步数闸 / 工具防重 / 超时 / fallback]
-  H --> O[可观测<br/>trace_id / usage / JSONL]
+  H --> O[可观测<br/>trace_id / span / usage / JSONL]
   O --> E[评测 /eval/*]
 ```
 
@@ -24,7 +24,7 @@ flowchart TD
 | 工具防重 | 检索工具内 `seen` dict | 同一轮重复 query 复用上次结果；计算器故意不做（纯函数、零副作用） |
 | 记忆 | LangGraph checkpointer | `thread_id=conversation_id`；sqlite 本地 / Postgres 多副本；超长会话压缩 |
 | 失败兜底 | 主/备 LLM、超时、降级 | 主供应商失败可切 backup；MCP 工具失败不伪造答案 |
-| 可观测 | trace_id + usage + JSONL + `/metrics` | 每问记模型调用/工具调用/token/步数；`GET /rag/trace`；Prometheus 请求计数/延迟/uptime |
+| 可观测 | trace_id + 逐阶段 span + usage + JSONL + `/metrics` | 解析/检索/生成/工具/Agent 各阶段耗时；每问记模型调用/工具调用/token/步数；`GET /rag/trace`；Prometheus 请求计数/延迟/uptime |
 | 评测 | `/api/v1/eval/*` | 检索 61 题、生成 12 正 + 8 负、Agent 5 任务；三层都 bypass 缓存 |
 | 多副本 | Redis + Postgres + 独立 Chroma | 限流/记忆/向量库/缓存外置，换副本状态不丢 |
 

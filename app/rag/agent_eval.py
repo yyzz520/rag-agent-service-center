@@ -18,7 +18,7 @@ from langchain_core.messages import HumanMessage
 from app.agent.graph import build_agent, open_sync_checkpointer
 from app.config import settings
 from app.rag import cache
-from app.rag.trace import begin_trace, current_usage, end_trace, rotate_jsonl_if_needed
+from app.rag.trace import begin_trace, current_usage, end_trace, rotate_jsonl_if_needed, span
 
 EVAL_DIR = Path(settings.persist_dir).parent / "eval"  # data/eval，与 RAG 评测同目录
 TASKS_PATH = EVAL_DIR / "agent_tasks.json"
@@ -58,7 +58,8 @@ def _run_task(task: dict) -> dict:
             # 全新线程：invoke 返回的消息就是本轮全部消息，不需要像线上那样切尾部。
             # bypass 检索缓存：评测要打真实检索链路，缓存命中会让结果偏乐观且不可复现。
             with cache.bypass():
-                result = agent.invoke({"messages": [HumanMessage(content=question)]}, config=config)
+                with span("agent.eval.run"):
+                    result = agent.invoke({"messages": [HumanMessage(content=question)]}, config=config)
             messages = result["messages"]
             answer = _text(messages[-1])
             tools_used = [m.name for m in messages if getattr(m, "type", "") == "tool"]

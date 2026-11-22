@@ -10,6 +10,8 @@ from langchain_core.documents import Document
 from openpyxl import load_workbook
 from pypdf import PdfReader
 
+from app.rag.trace import span
+
 # 整份 PDF 提取到的文字层字符数低于该阈值 => 判定扫描/图像 PDF（走 MinerU OCR）。
 # 文字层 PDF 阈值低：正常文档几乎不会整份连 10 个字符都没有。
 _SCANNED_TEXT_MAX = 10
@@ -17,15 +19,16 @@ _SCANNED_TEXT_MAX = 10
 
 def load_document(path: Path) -> list[Document]:
     suffix = path.suffix.lower()
-    if suffix == ".pdf":
-        return _load_pdf(path)
-    if suffix == ".docx":
-        return [_load_docx(path)]
-    if suffix == ".xlsx":
-        return [_load_xlsx(path)]
-    if suffix in (".md", ".txt"):
-        return TextLoader(str(path), encoding="utf-8").load()
-    raise ValueError(f"不支持的格式: {suffix}（仅支持 .txt .md .pdf .docx .xlsx）")
+    with span("parse", suffix=suffix):
+        if suffix == ".pdf":
+            return _load_pdf(path)
+        if suffix == ".docx":
+            return [_load_docx(path)]
+        if suffix == ".xlsx":
+            return [_load_xlsx(path)]
+        if suffix in (".md", ".txt"):
+            return TextLoader(str(path), encoding="utf-8").load()
+        raise ValueError(f"不支持的格式: {suffix}（仅支持 .txt .md .pdf .docx .xlsx）")
 
 
 def _load_pdf(path: Path) -> list[Document]:
