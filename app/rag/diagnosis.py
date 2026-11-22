@@ -20,7 +20,8 @@ _SUGGESTIONS = {
     "citation_missing": "答案对但没有引用：检查生成提示词是否强制标 [n]。",
     "judge_error": "裁判调用失败：评测本身的问题，先修 judge，不要当成模型效果差。",
     "agent_routing": "Agent 工具路由不对：检查工具描述、expect_tools 和提示词。",
-    "agent_completion": "Agent 答案不达标：检查工具返回、上下文和最终回答约束。",
+    "agent_completion_retrieval_suspect": "Agent 调了知识库仍答错：优先查检索召回/切块/来源，再查生成。",
+    "agent_completion_generation_or_routing": "Agent 没调知识库就答错：查工具路由、生成或工具返回。",
 }
 
 
@@ -84,8 +85,14 @@ def diagnose_agent(items: list[dict]) -> list[dict]:
                 "expect_tools": item.get("expect_tools"),
             })
         if not item.get("answer_ok"):
-            _add(out, "agent", "agent_completion", question, {
-                "tools_used": item.get("tools_used"),
+            tools = item.get("tools_used") or []
+            category = (
+                "agent_completion_retrieval_suspect"
+                if "search_knowledge_base" in tools
+                else "agent_completion_generation_or_routing"
+            )
+            _add(out, "agent", category, question, {
+                "tools_used": tools,
                 "answer": (item.get("answer") or "")[:200],
             })
     return out

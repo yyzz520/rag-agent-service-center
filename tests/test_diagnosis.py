@@ -36,6 +36,11 @@ def test_diagnose_agent_routing_and_completion():
     items = [
         {"question": "a1", "routed": False, "answer_ok": True, "tools_used": [], "expect_tools": ["search_knowledge_base"]},
         {"question": "a2", "routed": True, "answer_ok": False, "tools_used": ["calculator"], "answer": "bad"},
+        {"question": "a3", "routed": True, "answer_ok": False, "tools_used": ["search_knowledge_base"], "answer": "bad"},
     ]
     out = diagnose_agent(items)
-    assert [x["category"] for x in out] == ["agent_routing", "agent_completion"]
+    assert [x["category"] for x in out] == [
+        "agent_routing",
+        "agent_completion_generation_or_routing",
+        "agent_completion_retrieval_suspect",
+    ]

@@ -14,6 +14,7 @@
 - 检索评测增加 precision@k / NDCG@k；生成评测增加引用正确率（`citation_correct_rate`）。
 - `make export-finetune` 导出 RAG 答案样本（instruction/input/output）和 Agent 轨迹（messages + tool_calls，含工具参数与截断后的工具结果）。
 - Agent 评测报告新增 `trajectory` 字段，支持轨迹级数据回流。
+- 诊断支持 Agent 失败跨层归因：调了知识库仍答错 → 检索召回可疑；没调知识库 → 路由/生成。
 - Docker 非 root 运行。
 
 ### Changed
