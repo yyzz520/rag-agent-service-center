@@ -77,6 +77,8 @@ python3 -m venv .venv
 .venv/bin/uvicorn app.main:app --reload   # http://localhost:8200/docs
 ```
 
+> Windows 本地运行：用 `python -m venv .venv`，然后 `.venv\Scripts\pip install -r requirements.txt`、`.venv\Scripts\uvicorn app.main:app --reload`。Windows 不要直接复用 Linux 的 `.venv`（解释器路径不同），重建 venv 或用 Docker/WSL2。
+
 **零依赖档**：不启任何中间件，元数据走 SQLite、向量走嵌入式 Chroma、限流在进程内——看功能足够。
 
 **Docker 完整部署**：`cp .env.example .env` 填好 key 后 `docker compose up -d --build`，入口在 `http://localhost:8201`；多副本加 `--scale app=3`。这套 compose 是在单机复现生产拓扑，不是生产编排方案。从零部署、验证、服务器改动与排错见 [部署与多副本](docs/deployment.md)。

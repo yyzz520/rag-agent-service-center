@@ -25,7 +25,7 @@ flowchart TD
 | 记忆 | LangGraph checkpointer | `thread_id=conversation_id`；sqlite 本地 / Postgres 多副本；超长会话压缩 |
 | 失败兜底 | 主/备 LLM、超时、降级 | 主供应商失败可切 backup；MCP 工具失败不伪造答案 |
 | 可观测 | trace_id + 逐阶段 span + usage + JSONL + `/metrics` | 解析/检索/生成/工具/Agent 各阶段耗时；每问记模型调用/工具调用/token/步数；`GET /rag/trace`；Prometheus 请求计数/延迟/uptime |
-| 评测 | `/api/v1/eval/*` | 检索 61 题、生成 12 正 + 8 负、Agent 5 任务；三层都 bypass 缓存 |
+| 评测 | `/api/v1/eval/*` | 检索 61 题、生成 12 正 + 8 负、Agent 8 任务；三层都 bypass 缓存 |
 | 多副本 | Redis + Postgres + 独立 Chroma | 限流/记忆/向量库/缓存外置，换副本状态不丢 |
 
 ## 2. 生产级判断标准

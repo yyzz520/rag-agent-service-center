@@ -151,6 +151,8 @@ python3 -m venv .venv
 .venv/bin/uvicorn app.main:app --reload   # http://localhost:8200/docs
 ```
 
+> Windows：用 `python -m venv .venv`，然后 `.venv\Scripts\pip` / `.venv\Scripts\uvicorn`；不要直接复用 Linux 的 `.venv`（解释器路径不同），重建 venv 或用 Docker/WSL2。
+
 验证：`curl -s http://localhost:8200/health`，`api_key_ready` 应为 `true`。
 
 ## 变体：app 跑宿主机、只把中间件放容器

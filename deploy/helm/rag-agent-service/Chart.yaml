@@ -3,4 +3,4 @@ name: rag-agent-service
 description: RAG + Agent service center (FastAPI + LangGraph + Chroma)
 type: application
 version: 0.1.1
-appVersion: "0.4.8"
+appVersion: "0.4.9"
