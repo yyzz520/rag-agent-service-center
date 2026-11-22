@@ -2,6 +2,8 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.tools import tool
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
@@ -18,6 +20,15 @@ def _temp_ledger(tmp_path, monkeypatch):
 
 def _ai(calls: list[dict]) -> AIMessage:
     return AIMessage(content="", tool_calls=calls)
+
+
+def test_expiry_and_reject_decisions():
+    now = datetime.now(timezone.utc)
+    fresh = {"created_at": now.isoformat(), "pending": [{"tool_call_id": "c1"}]}
+    stale = {"created_at": (now - timedelta(seconds=999)).isoformat(), "pending": [{"tool_call_id": "c1"}]}
+    assert not approval.is_expired(fresh, timeout=300)
+    assert approval.is_expired(stale, timeout=300)
+    assert approval.reject_decisions(stale) == {"c1": {"type": "reject"}}
 
 
 def test_local_read_only_tools_skip_approval():
@@ -157,7 +168,8 @@ def test_reject_skips_tool_and_continues(monkeypatch):
 
     assert executed == []
     assert done["messages"][-1].content == "完成"
-    assert any(
-        isinstance(m, ToolMessage) and m.tool_call_id == "c1"
-        for m in done["messages"]
-    )
+    rejected = [
+        m for m in done["messages"]
+        if isinstance(m, ToolMessage) and m.tool_call_id == "c1"
+    ]
+    assert rejected and rejected[0].additional_kwargs.get("approval") == "rejected"

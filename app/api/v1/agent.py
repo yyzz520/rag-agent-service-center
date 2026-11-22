@@ -11,7 +11,11 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.agent.approval import AgentAwaitingApproval
+from app.agent.approval import (
+    AgentAwaitingApproval,
+    is_expired,
+    reject_decisions,
+)
 from app.agent.guard import AgentRunLimitError
 from app.agent.graph import (
     amaybe_compress_thread,
@@ -112,17 +116,26 @@ def _interrupt_payload(source) -> dict | None:
     return value if isinstance(value, dict) else {"raw": value}
 
 
-def _approval_expired(payload: dict) -> bool:
-    created = payload.get("created_at")
-    if not created:
-        return False
-    try:
-        ts = datetime.fromisoformat(created)
-    except ValueError:
-        return False
-    if ts.tzinfo is None:
-        ts = ts.replace(tzinfo=timezone.utc)
-    return (datetime.now(timezone.utc) - ts).total_seconds() > settings.agent_approval_timeout
+def _expired_auditor(db: Session, user: UserContext):
+    """超时自动拒绝也要留审计：谁都没点，系统按 fail-closed 拒了。"""
+    def audit(pending: dict) -> None:
+        audit_record(
+            db, user, "agent.approve", pending["tool_call_id"],
+            f"{pending.get('name')}:reject（超时自动拒绝）",
+        )
+    return audit
+
+
+def _run_expiry(agent, config: dict, payload: dict, on_expired=None) -> dict:
+    """按拒绝恢复一次挂起的审批（惰性超时兜底），返回恢复后的结果。"""
+    result = agent.invoke(Command(resume={"decisions": reject_decisions(payload)}), config=config)
+    if on_expired:
+        for pending in payload.get("pending", []):
+            try:
+                on_expired(pending)
+            except Exception:
+                logger.warning("审批超时审计写入失败", exc_info=True)
+    return result
 
 
 def _thread_has_pending_question(saver, conversation_id: str, question: str) -> bool:
@@ -143,6 +156,7 @@ def _invoke_agent(
     llm=None,
     replay: bool = False,
     replay_check: bool = False,
+    on_expired=None,
 ) -> tuple[str, list[str]]:
     """跑一轮对话，返回 (answer, tools_used)。llm 默认主供应商；fallback 时传备份 LLM。
 
@@ -161,10 +175,16 @@ def _invoke_agent(
         if not replay:
             maybe_compress_thread(agent, conversation_id, llm=llm)
         config = _agent_config(conversation_id)
-        # 上个问题还挂着未审批的工具调用时，直接塞新问题会造成悬空 tool_call（LLM 接口会拒），
-        # 先把待审批状态原样返回给前端，要求先批准/拒绝。
+        # 上个问题还挂着未审批的工具调用时，直接塞新问题会造成悬空 tool_call（LLM 接口会拒）：
+        # 未超时的先返回待审批；已超时的按拒绝自动恢复（惰性超时兜底），再继续本轮新问题。
         if not replay:
-            pending = _interrupt_payload(agent.get_state(config))
+            snap = agent.get_state(config)
+            pending = _interrupt_payload(snap)
+            if pending is not None and is_expired(pending):
+                prior2 = len(list((snap.values or {}).get("messages") or []))
+                result = _run_expiry(agent, config, pending, on_expired)
+                _count_usage_from_messages(result["messages"][prior2:], tool_count=0)
+                pending = _interrupt_payload(result)
             if pending is not None:
                 raise AgentAwaitingApproval(pending)
         # agent.invoke 返回的是整条线程历史：usage 记账与 tools 列表都必须是"本轮"口径，
@@ -177,7 +197,12 @@ def _invoke_agent(
             result = agent.invoke(inputs, config=config)
         messages = result["messages"]
         new_msgs = messages[prior_len:]
-        tools_used = [m.name for m in new_msgs if getattr(m, "type", "") == "tool"]
+        # 拒绝/超时自动拒绝也会生成 ToolMessage，但不算实际执行过的工具
+        tools_used = [
+            m.name for m in new_msgs
+            if getattr(m, "type", "") == "tool"
+            and getattr(m, "additional_kwargs", {}).get("approval") is None
+        ]
         _count_usage_from_messages(new_msgs, tool_count=len(tools_used))
         # 在工具执行前被审批 hook 挂起：本轮没结束，交给路由返回 awaiting_approval
         if result.get("__interrupt__"):
@@ -217,8 +242,11 @@ def agent_chat(
         return err
     token = begin_trace(source="agent", conversation_id=conversation_id)
     try:
+        on_expired = _expired_auditor(db, user)
         try:
-            answer, tools_used = _invoke_agent(allowed, conversation_id, question)
+            answer, tools_used = _invoke_agent(
+                allowed, conversation_id, question, on_expired=on_expired
+            )
         except (AgentRunLimitError, AgentAwaitingApproval):
             raise  # 护栏熔断/等待审批不是供应商故障，不能 fallback 重试
         except Exception:
@@ -233,6 +261,7 @@ def agent_chat(
                 question,
                 llm=backup,
                 replay_check=True,
+                on_expired=on_expired,
             )
         log_answer(question, answer)
         session_row.last_active_at = _now_utc()
@@ -279,7 +308,10 @@ def agent_chat_stream(
         return err
     trace_id = uuid.uuid4().hex[:12]
     return StreamingResponse(
-        _agent_stream(question, allowed, conversation_id, session_row, db, trace_id),
+        _agent_stream(
+            question, allowed, conversation_id, session_row, db, trace_id,
+            on_expired=_expired_auditor(db, user),
+        ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
@@ -295,6 +327,7 @@ async def _run_agent_turn(
     state_out: dict,
     llm=None,
     replay: bool = False,
+    on_expired=None,
 ):
     """把一轮 astream（模型↔工具多步）解包成 content/tool_start/tool_end 事件。
 
@@ -307,8 +340,22 @@ async def _run_agent_turn(
     )
     config = _agent_config(conversation_id)
     if not replay:
-        # 同非流式：有未审批操作时先返回待审批，不把新问题塞进悬空 tool_call 的历史
-        pending = _interrupt_payload(await agent.aget_state(config))
+        # 同非流式：未超时的待审批先返回；已超时的按拒绝自动恢复（惰性超时兜底）再继续
+        snap = await agent.aget_state(config)
+        pending = _interrupt_payload(snap)
+        if pending is not None and is_expired(pending):
+            prior2 = len(list((snap.values or {}).get("messages") or []))
+            result = await agent.ainvoke(
+                Command(resume={"decisions": reject_decisions(pending)}), config=config
+            )
+            _count_usage_from_messages(result["messages"][prior2:], tool_count=0)
+            if on_expired:
+                for p in pending.get("pending", []):
+                    try:
+                        on_expired(p)
+                    except Exception:
+                        logger.warning("审批超时审计写入失败", exc_info=True)
+            pending = _interrupt_payload(result)
         if pending is not None:
             state_out["interrupted"] = pending
             return
@@ -375,6 +422,7 @@ async def _agent_stream(
     session_row: ChatSession,
     db: Session,
     trace_id: str,
+    on_expired=None,
 ):
     token = begin_trace(source="agent", conversation_id=conversation_id, trace_id=trace_id)
     try:
@@ -387,7 +435,8 @@ async def _agent_stream(
             delivered = False  # 是否已吐过内容/tool 事件（meta 除外）
             try:
                 async for ev in _run_agent_turn(
-                    saver, allowed_doc_ids, conversation_id, question, answer_buf, tools_used, state_out
+                    saver, allowed_doc_ids, conversation_id, question, answer_buf,
+                    tools_used, state_out, on_expired=on_expired,
                 ):
                     delivered = True
                     yield ev
@@ -413,6 +462,7 @@ async def _agent_stream(
                     state_out,
                     llm=backup,
                     replay=True,
+                    on_expired=on_expired,
                 ):
                     yield ev
         if state_out.get("interrupted"):
@@ -474,7 +524,7 @@ def agent_approve(
                 return error(40003, "当前没有待审批的操作（可能已处理或会话未暂停）")
 
             pending = payload.get("pending", [])
-            expired = _approval_expired(payload)
+            expired = is_expired(payload)
             given = {} if expired else {d.tool_call_id: d for d in req.decisions}
             decisions: dict[str, dict] = {}
             for call in pending:
@@ -509,7 +559,12 @@ def agent_approve(
             messages = result["messages"]
             answer = messages[-1].content
             new_msgs = messages[prior_len:]
-            tools_used = [m.name for m in new_msgs if getattr(m, "type", "") == "tool"]
+            # 审批拒绝/幂等跳过也生成 ToolMessage（回给模型用），但不算“实际执行过的工具”
+            tools_used = [
+                m.name for m in new_msgs
+                if getattr(m, "type", "") == "tool"
+                and getattr(m, "additional_kwargs", {}).get("approval") is None
+            ]
             _count_usage_from_messages(new_msgs, tool_count=len(tools_used))
             if req.question:
                 log_answer(req.question, answer)

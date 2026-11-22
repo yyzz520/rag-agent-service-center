@@ -46,6 +46,29 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def is_expired(payload: dict, timeout: int | None = None) -> bool:
+    """审批挂起是否超时。惰性判定：在审批/新问题等下一次交互时调用，被挂起的图本身不占连接。"""
+    created = payload.get("created_at")
+    if not created:
+        return False
+    try:
+        ts = datetime.fromisoformat(created)
+    except ValueError:
+        return False
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    limit = settings.agent_approval_timeout if timeout is None else timeout
+    return (datetime.now(timezone.utc) - ts).total_seconds() > limit
+
+
+def reject_decisions(payload: dict) -> dict:
+    """超时兜底：把所有待审批调用一次性按拒绝处理（fail-closed）。"""
+    return {
+        p["tool_call_id"]: {"type": "reject"}
+        for p in payload.get("pending", [])
+    }
+
+
 def _mark_executed(scope: str, call: dict) -> bool:
     """执行前落账；返回 False = 同一 tool_call_id 已执行过（重放），本次应跳过。"""
     return execution_ledger.mark_executed(
@@ -115,6 +138,7 @@ def make_approval_hook(scope: str = "no-scope"):
                     content=_REPEAT_CONTENT,
                     tool_call_id=call["id"],
                     name=call.get("name"),
+                    additional_kwargs={"approval": "duplicate"},
                 ))
             elif decision not in ("approve", "edit"):
                 # 缺失/超时/拒绝一律按拒绝处理（fail-closed），把结果作为工具消息回给模型
@@ -122,6 +146,7 @@ def make_approval_hook(scope: str = "no-scope"):
                     content=_REJECT_CONTENT,
                     tool_call_id=call["id"],
                     name=call.get("name"),
+                    additional_kwargs={"approval": "rejected"},
                 ))
 
         if new_calls != last_ai.tool_calls:

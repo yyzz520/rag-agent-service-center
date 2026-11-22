@@ -23,7 +23,7 @@ flowchart TD
 | 运行熔断 | `pre_model_hook` 读本轮消息 | 业务口径四道硬上限：工具轮数 / 连续相同调用 / 耗时 / token；超限抛 `AgentRunLimitError`，返回 429，不触发 fallback |
 | 上下文预算 | `pre_model_hook` + 工具结果外置 | 超长工具结果原文落盘后截断；本轮总量仍超预算时压缩更早结果（最近 N 条保留）；只改正文，不破 tool_call 配对 |
 | 执行幂等 | 危险工具执行台账（SQLite） | 执行前按 `conversation_id + tool_call_id` 落账；崩溃/重放不再重复执行（at-most-once，宁可漏执行等人工复核） |
-| 人工审批（HITL） | `post_model_hook` + `interrupt()` | 模型产出 tool_calls 后、执行前暂停；`/agent/approve` 批准/拒绝/改参数后从 checkpoint 续跑；超时/缺失审批 fail-closed；决策落审计日志 |
+| 人工审批（HITL） | `post_model_hook` + `interrupt()` | 模型产出 tool_calls 后、执行前暂停；`/agent/approve` 批准/拒绝/改参数后从 checkpoint 续跑；超时/缺失审批 fail-closed；决策落审计日志。**超时惰性兜底**：挂起超过 `AGENT_APPROVAL_TIMEOUT` 秒后，下一次问新问题或审批会自动按拒绝恢复；挂起本身不占连接，只在 checkpointer 里留状态 |
 | 工具注册 | LangChain `@tool` + MCP | 工具名/描述/参数给模型；检索工具按请求闭包绑定文档范围 |
 | 工具防重 | 检索工具内 `seen` dict | 同一轮重复 query 复用上次结果；计算器故意不做（纯函数、零副作用） |
 | 记忆 | LangGraph checkpointer | `thread_id=conversation_id`；sqlite 本地 / Postgres 多副本；超长会话压缩；也是 HITL 暂停/恢复的载体 |
