@@ -102,6 +102,8 @@ python3 -m venv .venv
 make install-dev   # 建 .venv 并安装运行 + 测试依赖
 make verify        # ruff + pytest，提交前必跑
 make eval-gate     # 最近一次评测 vs baseline 阈值，低于阈值非 0 退出
+make seed          # 启动服务后一键上传 samples/medical（已存在跳过）
+make seed-eval     # seed + 跑一次检索评测
 make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
 ```
 

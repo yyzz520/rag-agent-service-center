@@ -1,6 +1,6 @@
 [project]
 name = "rag-agent-service-center"
-version = "0.4.2"
+version = "0.4.3"
 description = "RAG + Agent service center: hybrid retrieval, evaluation, observability"
 requires-python = ">=3.11"
 
