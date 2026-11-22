@@ -20,6 +20,7 @@ from app.rag.agent_eval import read_agent_reports, run_agent_eval
 from app.rag.diagnosis import run_diagnosis
 from app.rag.eval import read_reports, run_eval
 from app.rag.gen_eval import read_gen_reports, run_gen_eval
+from app.rag.plan_eval import read_plan_reports, run_plan_eval
 from app.rag.router_eval import read_router_reports, run_router_eval
 from app.services.audit import record as audit_record
 
@@ -46,6 +47,10 @@ class RouterEvalRequest(BaseModel):
     note: str | None = Field(default=None, description="给这次运行打个标签，便于和历史里的其他运行区分")
 
 
+class PlanEvalRequest(BaseModel):
+    note: str | None = Field(default=None, description="给这次运行打个标签，便于和历史里的其他运行区分")
+
+
 def _history(runs: list[dict]) -> dict:
     return {
         "total": len(runs),
@@ -55,6 +60,28 @@ def _history(runs: list[dict]) -> dict:
             for i, r in enumerate(runs, start=1)
         ],
     }
+
+
+@router.get("/plan", summary="查看 Plan-and-Execute 评测历史（仅管理员）")
+def list_plan_runs(_: UserContext = Depends(require_permission("eval:read"))):
+    return ok(_history(read_plan_reports()))
+
+
+@router.post("/plan", summary="跑一轮 Plan-and-Execute 评测（仅管理员；真调 LLM、有花费）")
+def run_plan_now(
+    req: PlanEvalRequest = PlanEvalRequest(),
+    user: UserContext = Depends(require_permission("eval:run")),
+    db: Session = Depends(get_db),
+):
+    try:
+        report = run_plan_eval(note=req.note)
+    except ValueError as e:
+        return error(40001, str(e))
+    except Exception as e:
+        return error(50001, f"计划评测失败：{e}", status=500)
+    audit_record(db, user, "eval.plan", req.note or "",
+                 f"success_rate={report['metrics'].get('success_rate')}")
+    return ok(report)
 
 
 @router.get("/router", summary="查看路由评测历史（仅管理员）")

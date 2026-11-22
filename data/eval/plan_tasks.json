@@ -1,0 +1,32 @@
+[
+  {
+    "question": "查一下批号 QS-2024-9527 的库区和放行状态，再查知识库里冷藏库的温控要求，判断存放是否合规",
+    "expect_tools": ["get_batch_storage", "search_knowledge_base"],
+    "expect_answer_contains": ["冷藏库", "2~8", "已放行"],
+    "max_steps": 4
+  },
+  {
+    "question": "对比批号 QS-2024-9527 和 QS-2024-8831 分别在哪个库区、是否放行",
+    "expect_tools": ["get_batch_storage"],
+    "expect_answer_contains": ["冷藏库", "阴凉库", "待检验"],
+    "max_steps": 4
+  },
+  {
+    "question": "查批号 QS-2024-7702 的库区和库存状态，并查知识库里近效期产品的管理要求",
+    "expect_tools": ["get_batch_storage", "search_knowledge_base"],
+    "expect_answer_contains": ["常温库", "近效期"],
+    "max_steps": 4
+  },
+  {
+    "question": "列出仓库当前在库的全部批号，并总结知识库里的偏差分级规则",
+    "expect_tools": ["list_batches", "search_knowledge_base"],
+    "expect_answer_contains": ["QS-2024-9527", "偏差"],
+    "max_steps": 4
+  },
+  {
+    "question": "查询批号 NOT-EXIST 的库区状态；如果查不到就如实说明",
+    "expect_tools": ["get_batch_storage"],
+    "expect_answer_contains": ["未查到"],
+    "max_steps": 2
+  }
+]

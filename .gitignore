@@ -7,6 +7,7 @@ data/eval/*
 !data/eval/golden_generation.json
 !data/eval/agent_tasks.json
 !data/eval/router_tasks.json
+!data/eval/plan_tasks.json
 !data/eval/baseline.json
 uploads/
 __pycache__/

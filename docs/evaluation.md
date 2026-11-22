@@ -57,7 +57,15 @@
 - 实测：路由 1.0、完成率 1.0、平均 0.88 步、约 3071 token；负样本 3/3 干净拒答，禁工具任务 0 调用。
 - Agent 评测会随模型调用波动，以最新报告为准；上一轮曾抓到 1 条完成失败，说明指标有区分度，不是恒为 1.0。
 
-## 5. Badcase 诊断
+## 5. Plan-and-Execute 评测（5 任务）
+
+- 数据集：`data/eval/plan_tasks.json`，多步任务（查批号 + 查温控规范 + 判断合规；对比两个批号；近效期管理等），全部使用**虚构医药+仓储数据**。
+- 成本：真跑计划生成 + 工具执行 + 合成答案，**有 token 花费**。
+- 指标：任务成功率（期望工具都执行 + 答案包含关键事实 + 步数不超限）、平均步数、平均 token、平均耗时；报告带 bootstrap 区间、题集指纹、`plan/plan_synth` 版本。
+- 实测：5/5 成功，平均 1.8 步、2877 token、16.1 秒（固定小集，用于回归与选型，不代表开放域成功率）。
+- 评测用 MemorySaver + 独立 thread，自动 approve，不碰线上会话；HITL 审批链路由单元测试覆盖。
+
+## 6. Badcase 诊断
 
 `GET /api/v1/eval/diagnosis` 读最近一次三层评测，按规则归因：
 
@@ -79,11 +87,13 @@ POST /api/v1/eval/retrieval     # 检索评测，可传 candidate_pool/per_query
 POST /api/v1/eval/generation    # 生成评测
 POST /api/v1/eval/agent         # Agent 行为评测
 POST /api/v1/eval/router        # 意图路由评测（规则分类，零花费）
+POST /api/v1/eval/plan          # Plan-and-Execute 窄场景评测（真调 LLM，有花费）
 
 GET  /api/v1/eval/retrieval     # 历史
 GET  /api/v1/eval/generation
 GET  /api/v1/eval/agent
 GET  /api/v1/eval/router
+GET  /api/v1/eval/plan
 GET  /api/v1/eval/summary       # 三层最新指标汇总
 GET  /api/v1/eval/diagnosis     # 最近一次评测的规则化 badcase 归因
 ```
