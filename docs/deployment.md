@@ -214,7 +214,7 @@ docker compose up -d --build --scale app=3   # 入口在 nginx：http://localhos
 
 内置演示账号（可在 `.env` 用 `DEMO_USERS_JSON` 覆盖）：`alice/alice123`(user)、`bob/bob123`(user)、`admin/admin123`(admin)。
 
-`/rag/eval`、`/rag/agent-eval`、`/rag/trace`、`/rag/chunks` 为内部诊断接口，仅管理员可调。
+`/eval/retrieval`、`/eval/generation`、`/eval/agent`、`/rag/trace`、`/rag/chunks` 为内部诊断接口，仅管理员可调。
 
 ```bash
 # 登录（Docker 部署走 nginx 的 8201；本机 uvicorn 直接跑则换成 8200）
@@ -231,8 +231,8 @@ curl -X POST http://localhost:8201/api/v1/docs \
 
 ## 数据说明
 
-- `data/`（SQLite + Chroma + trace + 评测报告）、`uploads/`（源文件）默认被 `.gitignore` 忽略，新 clone 需自行上传文档建库。**只有 `data/eval/golden.json` 和 `agent_tasks.json` 两个评测数据集被放行**，保证 clone 后能直接复跑评测。
-- 评测黄金问题集在 `data/eval/golden.json`，`POST /rag/eval` 只重放检索、不出答案；同一组题改参重跑后 `GET /rag/eval` 逐行对比分数（recall@k / MRR），归因到参数而非生成波动。
+- `data/`（SQLite + Chroma + trace + 评测报告）、`uploads/`（源文件）默认被 `.gitignore` 忽略，新 clone 需自行上传文档建库。**只有 `data/eval/golden.json`、`golden_generation.json` 和 `agent_tasks.json` 三个评测数据集被放行**，保证 clone 后能直接复跑评测。
+- 评测黄金问题集在 `data/eval/golden.json`，`POST /eval/retrieval` 只重放检索、不出答案；同一组题改参重跑后 `GET /eval/retrieval` 逐行对比分数（recall@k / MRR），归因到参数而非生成波动。
 - agent 行为评测任务集在 `data/eval/agent_tasks.json`（路由正确 / 该不该调工具 / 答案是否达标），报告落 `agent_reports.jsonl`。与 RAG 评测最大的不同：**它会真跑 LLM、有花费**，所以只放 5 条固定任务。
 - 评测跑的时候会**整体绕过检索缓存**（`cache.bypass()`）：命中缓存会让分数虚高且不可复现，评测必须打真链路。
 - `data/trace/trace.jsonl` 每问一条 answer 记录，带 `usage` 字段（`model_calls`/`tool_calls`/`prompt_tokens`/`completion_tokens`/`total_tokens`）——每 run LLM 消耗记账，`GET /rag/trace`（管理员）可查。

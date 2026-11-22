@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from app.agent.graph import init_checkpointer
 from app.agent.mcp_tools import get_mcp_tools
 from app.api.responses import ok
-from app.api.v1 import agent, auth, docs, kb, rag, sessions
+from app.api.v1 import agent, auth, docs, eval as eval_api, kb, rag, sessions
 from app.config import settings
 from app.db import init_db
 from app.limiter import limiter
@@ -158,6 +158,7 @@ app.include_router(kb.router, prefix="/api/v1")
 app.include_router(docs.router, prefix="/api/v1")
 app.include_router(rag.router, prefix="/api/v1")
 app.include_router(agent.router, prefix="/api/v1")
+app.include_router(eval_api.router, prefix="/api/v1")
 app.include_router(sessions.router, prefix="/api/v1")
 
 

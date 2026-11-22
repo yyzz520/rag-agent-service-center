@@ -22,9 +22,13 @@
 | POST | /api/v1/agent/chat/stream | 智能体流式（SSE）：`meta` → 可交错 `tool_start`/`content`/`tool_end` → `done`(答案+tools) |
 | GET | /api/v1/sessions | 我的会话列表（conversation_id 给 agent 续传） |
 | DELETE | /api/v1/sessions/{session_id} | 删会话：记录 + 会话记忆一起清 |
-| POST | /api/v1/rag/eval | 跑 RAG 检索评测（**只重放检索、不出答案**，所以无 LLM 花费）。body: 可传检索参数覆盖 |
-| GET | /api/v1/rag/agent-eval | agent 行为评测历史报告（逐轮对比路由正确率/完成率/平均步数/平均 token） |
-| POST | /api/v1/rag/agent-eval | 跑一轮 agent 行为评测（**真跑 LLM、有花费**，任务集见 `data/eval/agent_tasks.json`） |
+| POST | /api/v1/eval/retrieval | 跑 RAG 检索评测（**只重放检索、不出答案**，所以无 LLM 花费）。body: 可传检索参数覆盖 |
+| GET | /api/v1/eval/retrieval | 检索评测历史与逐轮对比 |
+| POST | /api/v1/eval/generation | 跑生成评测（正样本正确率/引用率、负样本拒答率；**真调 LLM、有花费**） |
+| GET | /api/v1/eval/generation | 生成评测历史 |
+| POST | /api/v1/eval/agent | 跑一轮 agent 行为评测（**真跑 LLM、有花费**，任务集见 `data/eval/agent_tasks.json`） |
+| GET | /api/v1/eval/agent | agent 行为评测历史报告（逐轮对比路由正确率/完成率/平均步数/平均 token） |
+| GET | /api/v1/eval/summary | 三层评测最新指标汇总 |
 | GET | /health | 健康检查：chunks / auth_enabled / api_key_ready |
 
 ## SSE 事件格式

@@ -44,13 +44,14 @@
 
 ```bash
 # 管理员登录后
-POST /api/v1/rag/eval          # 检索评测，可传 candidate_pool/per_query_top/max_docs/use_rerank
-POST /api/v1/rag/gen-eval      # 生成评测
-POST /api/v1/rag/agent-eval    # Agent 行为评测
+POST /api/v1/eval/retrieval     # 检索评测，可传 candidate_pool/per_query_top/max_docs/use_rerank
+POST /api/v1/eval/generation    # 生成评测
+POST /api/v1/eval/agent         # Agent 行为评测
 
-GET  /api/v1/rag/eval          # 历史
-GET  /api/v1/rag/gen-eval
-GET  /api/v1/rag/agent-eval
+GET  /api/v1/eval/retrieval     # 历史
+GET  /api/v1/eval/generation
+GET  /api/v1/eval/agent
+GET  /api/v1/eval/summary       # 三层最新指标汇总
 ```
 
 ## 口径与边界

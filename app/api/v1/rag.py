@@ -182,7 +182,8 @@ def list_trace(_: UserContext = Depends(require_admin)):
     return ok({"total": len(items), "items": items})
 
 
-@router.get("/eval", summary="查看评测历史（内部诊断，仅管理员）")
+# Legacy hidden aliases: canonical eval routes are /api/v1/eval/*.
+@router.get("/eval", summary="查看评测历史（内部诊断，仅管理员）", include_in_schema=False)
 def list_eval_runs(_: UserContext = Depends(require_admin)):
     runs = read_reports()
     latest = runs[-1] if runs else None
@@ -193,7 +194,7 @@ def list_eval_runs(_: UserContext = Depends(require_admin)):
     return ok({"total": len(runs), "latest": latest, "summary": summary})
 
 
-@router.post("/eval", summary="跑一轮评测（仅管理员；同一组题改参重跑即可对比）")
+@router.post("/eval", summary="跑一轮评测（仅管理员；同一组题改参重跑即可对比）", include_in_schema=False)
 def run_eval_now(
     req: EvalRequest = EvalRequest(),
     _: UserContext = Depends(require_admin),
@@ -213,7 +214,7 @@ def run_eval_now(
     return ok(report)
 
 
-@router.get("/agent-eval", summary="查看 agent 行为评测历史（内部诊断，仅管理员）")
+@router.get("/agent-eval", summary="查看 agent 行为评测历史（内部诊断，仅管理员）", include_in_schema=False)
 def list_agent_eval_runs(_: UserContext = Depends(require_admin)):
     runs = read_agent_reports()
     latest = runs[-1] if runs else None
@@ -224,7 +225,7 @@ def list_agent_eval_runs(_: UserContext = Depends(require_admin)):
     return ok({"total": len(runs), "latest": latest, "summary": summary})
 
 
-@router.post("/agent-eval", summary="跑一轮 agent 行为评测（仅管理员；真调 LLM，有 token 花费）")
+@router.post("/agent-eval", summary="跑一轮 agent 行为评测（仅管理员；真调 LLM，有 token 花费）", include_in_schema=False)
 def run_agent_eval_now(
     req: AgentEvalRequest = AgentEvalRequest(),
     _: UserContext = Depends(require_admin),
@@ -238,7 +239,7 @@ def run_agent_eval_now(
     return ok(report)
 
 
-@router.get("/gen-eval", summary="查看生成评测历史（内部诊断，仅管理员）")
+@router.get("/gen-eval", summary="查看生成评测历史（内部诊断，仅管理员）", include_in_schema=False)
 def list_gen_eval_runs(_: UserContext = Depends(require_admin)):
     runs = read_gen_reports()
     latest = runs[-1] if runs else None
@@ -249,7 +250,7 @@ def list_gen_eval_runs(_: UserContext = Depends(require_admin)):
     return ok({"total": len(runs), "latest": latest, "summary": summary})
 
 
-@router.post("/gen-eval", summary="跑一轮生成评测（仅管理员；真调 LLM，有 token 花费）")
+@router.post("/gen-eval", summary="跑一轮生成评测（仅管理员；真调 LLM，有 token 花费）", include_in_schema=False)
 def run_gen_eval_now(
     req: GenEvalRequest = GenEvalRequest(),
     _: UserContext = Depends(require_admin),
