@@ -20,12 +20,12 @@
 
 项目重点不在"能跑起来"，而在**生产环境真实会遇到的几件事**——多租户隔离、会话持久化、多副本一致性、评测可复现。所以它有两档部署（零依赖 / 生产形态），并且明确列出**没做和做不了的边界**。
 
-定位：聚焦 **RAG/Agent 服务层与治理**（检索、Agent Harness、评测、可观测、审计、配额）；多租户平台管理、工作流画布、Skills 市场、沙箱、HITL 不在本项目范围，作为后续扩展方向。
+定位：聚焦 **RAG/Agent 服务层与治理**（检索、Agent Harness、评测、可观测、审计、配额）；多租户平台管理、工作流画布、Skills 市场、沙箱不在本项目范围。HITL 只做**工具级审批**（外部工具执行前暂停、审批后续跑），平台级审批流不在范围。
 
 | 能力 | 说明 |
 |---|---|
 | **检索** | 结构感知父子块切分（标题/章节/表格，子块检索、父块补上下文）→ 查询改写 → 向量 + BM25 混合 → RRF 融合 → Rerank 精排 → 带 `[n]` 引用作答 |
-| **Agent Harness** | LangGraph ReAct：工具注册、checkpointer 记忆、步数闸/工具防重/超时、MCP 外部工具；能力边界见 [Harness 层](docs/harness.md) |
+| **Agent Harness** | LangGraph ReAct：工具注册、checkpointer 记忆、业务级四道熔断（步数/重复/耗时/token）、工具防重、超时、外部工具人工审批（HITL）、MCP 外部工具；能力边界见 [Harness 层](docs/harness.md) |
 | **多租户** | 分块打 `doc_id/user_id/kb_id`，检索按本人文档在 Chroma / BM25 双路收窄 |
 | **多副本** | 限流 / 会话记忆 / 向量库 / 缓存全部外置，`--scale app=N` 后请求落到任何副本都正确 |
 | **评测** | RAG 检索评测（recall@k / MRR，零 LLM 花费）+ agent 行为评测（真跑 LLM） |
@@ -64,7 +64,7 @@ flowchart TD
 - **长会话压缩**：历史超过阈值（默认 16 条）时，下一轮把更早对话折成摘要、只留最近 8 条原文，上下文不无限增长
 - **多格式解析**：`.txt/.md/.pdf/.docx/.xlsx`，Office/PDF 均带 MIME 内容嗅探；无文字层的扫描/图像 PDF 自动走 MinerU Cloud OCR
 
-**Harness 边界**：这是最小生产级 harness——循环/工具/记忆/护栏/可观测/评测/多副本都有；不含沙箱、子智能体路由、Skills 市场、HITL。完整能力矩阵、扩展点和生产级判断标准见 [Harness 层](docs/harness.md)。
+**Harness 边界**：这是最小生产级 harness——循环/工具/记忆/四道业务熔断/工具级 HITL/可观测/评测/多副本都有；不含沙箱、子智能体路由、Skills 市场和平台级审批流。HITL 只在外部工具执行前暂停（`/agent/approve` 批准/拒绝/改参数），本地只读工具自动放行。完整能力矩阵、扩展点和生产级判断标准见 [Harness 层](docs/harness.md)。
 
 ## 快速开始
 

@@ -80,6 +80,18 @@ class Settings(BaseSettings):
     # 默认 LangGraph 就是 25；显式配置 + 观察平均轮数后调，别默默吃默认
     agent_recursion_limit: int = 25
 
+    # ReAct 业务硬上限（和 recursion_limit 的 super-step 分开，按"一轮工具=一步"计）：
+    # 工具轮数 / 连续相同调用 / 本轮耗时 / 本轮 token，任一越限直接终止本轮。
+    agent_max_tool_steps: int = 10
+    agent_max_identical_calls: int = 3
+    agent_max_run_seconds: int = 120
+    agent_max_run_tokens: int = 60000
+
+    # HITL：外部工具执行前人工审批。本地只读工具（知识库检索/计算器）始终放行；
+    # 超时/缺失审批按拒绝处理（fail-closed），不会默认批准。
+    agent_approval_enabled: bool = True
+    agent_approval_timeout: int = 300
+
     # ---- 外部 MCP 工具（M5）----
     # 空 = 不接外部工具（默认，保证零配置能跑）。填 JSON 才启用，形如：
     #   {"wms":{"command":"python","args":["-m","mcp_servers.wms_server"],"transport":"stdio"}}

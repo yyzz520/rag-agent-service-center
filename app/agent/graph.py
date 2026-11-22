@@ -10,6 +10,8 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.prebuilt import create_react_agent
 
+from app.agent.approval import make_approval_hook
+from app.agent.guard import make_pre_model_hook
 from app.agent.mcp_tools import get_mcp_tools
 from app.agent.tools import calculator, make_search_knowledge_base_tool
 from app.ai.providers import backup_llm, primary_llm
@@ -133,6 +135,10 @@ def build_agent(
         _scope_tools(allowed_doc_ids),
         prompt=_AGENT_SYSTEM,
         checkpointer=checkpointer,
+        # 每次模型调用前做业务级熔断；模型产出工具调用后、执行前做人工审批。
+        # 两者都在 harness 层，工具实现本身不感知。
+        pre_model_hook=make_pre_model_hook(),
+        post_model_hook=make_approval_hook(),
     )
 
 

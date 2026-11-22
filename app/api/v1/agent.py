@@ -1,14 +1,18 @@
 import logging
 import uuid
 from datetime import datetime, timezone
+from typing import Literal
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
+from langgraph.types import Command
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.agent.approval import AgentAwaitingApproval
+from app.agent.guard import AgentRunLimitError
 from app.agent.graph import (
     amaybe_compress_thread,
     build_agent,
@@ -28,6 +32,7 @@ from app.db import get_db
 from app.models import Session as ChatSession
 from app.rag.trace import begin_trace, current_usage, end_trace, log_answer, span
 from app.services.access import owned_doc, owned_doc_ids
+from app.services.audit import record as audit_record
 
 router = APIRouter(prefix="/agent", tags=["智能体 Agent"])
 
@@ -36,6 +41,19 @@ class AgentRequest(BaseModel):
     question: str
     conversation_id: str | None = None  # GET /sessions 的 conversation_id；不传 = 新开会话
     doc: str | None = None  # 文档 ID（/docs 的 doc_id）；指定后知识库工具只在该文档内检索，null=本人全库
+
+
+class ApprovalDecision(BaseModel):
+    tool_call_id: str
+    type: Literal["approve", "reject", "edit"]
+    args: dict | None = None  # type=edit 时替换工具参数
+
+
+class ApprovalRequest(BaseModel):
+    conversation_id: str
+    decisions: list[ApprovalDecision]
+    doc: str | None = None  # 与原始提问的检索范围保持一致，恢复后新增工具调用仍按该范围
+    question: str | None = None  # 仅用于 trace/答案记账，可空
 
 
 def _now_utc() -> datetime:
@@ -85,6 +103,28 @@ def _agent_config(conversation_id: str) -> dict:
     }
 
 
+def _interrupt_payload(source) -> dict | None:
+    """从 invoke 结果（dict）或 state snapshot 里取第一个 interrupt 的值。"""
+    interrupts = source.get("__interrupt__") if isinstance(source, dict) else getattr(source, "interrupts", None)
+    if not interrupts:
+        return None
+    value = getattr(interrupts[0], "value", interrupts[0])
+    return value if isinstance(value, dict) else {"raw": value}
+
+
+def _approval_expired(payload: dict) -> bool:
+    created = payload.get("created_at")
+    if not created:
+        return False
+    try:
+        ts = datetime.fromisoformat(created)
+    except ValueError:
+        return False
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - ts).total_seconds() > settings.agent_approval_timeout
+
+
 def _thread_has_pending_question(saver, conversation_id: str, question: str) -> bool:
     """重试前判断这轮 human 是否已落进线程（主供应商在模型节点挂：__start__ 已先入库）。
 
@@ -119,6 +159,12 @@ def _invoke_agent(
         if not replay:
             maybe_compress_thread(agent, conversation_id, llm=llm)
         config = _agent_config(conversation_id)
+        # 上个问题还挂着未审批的工具调用时，直接塞新问题会造成悬空 tool_call（LLM 接口会拒），
+        # 先把待审批状态原样返回给前端，要求先批准/拒绝。
+        if not replay:
+            pending = _interrupt_payload(agent.get_state(config))
+            if pending is not None:
+                raise AgentAwaitingApproval(pending)
         # agent.invoke 返回的是整条线程历史：usage 记账与 tools 列表都必须是"本轮"口径，
         # 不能把前几轮的 ai 消耗/工具再数一遍（多轮下会逐轮虚高/重复）。先快照线程长度，
         # invoke 后只统计尾部新追加的消息。
@@ -128,10 +174,13 @@ def _invoke_agent(
         with span("agent.run"):
             result = agent.invoke(inputs, config=config)
         messages = result["messages"]
-        answer = messages[-1].content
         new_msgs = messages[prior_len:]
         tools_used = [m.name for m in new_msgs if getattr(m, "type", "") == "tool"]
         _count_usage_from_messages(new_msgs, tool_count=len(tools_used))
+        # 在工具执行前被审批 hook 挂起：本轮没结束，交给路由返回 awaiting_approval
+        if result.get("__interrupt__"):
+            raise AgentAwaitingApproval(_interrupt_payload(result) or {})
+        answer = messages[-1].content
     return answer, tools_used
 
 
@@ -168,6 +217,8 @@ def agent_chat(
     try:
         try:
             answer, tools_used = _invoke_agent(allowed, conversation_id, question)
+        except (AgentRunLimitError, AgentAwaitingApproval):
+            raise  # 护栏熔断/等待审批不是供应商故障，不能 fallback 重试
         except Exception:
             backup = get_agent_backup_llm()
             if backup is None:
@@ -191,6 +242,18 @@ def agent_chat(
             "answer": answer,
             "tools": tools_used,
         })
+    except AgentAwaitingApproval as e:
+        session_row.last_active_at = _now_utc()
+        db.commit()
+        return ok({
+            "conversation_id": conversation_id,
+            "question": question,
+            "status": "awaiting_approval",
+            "pending": e.payload.get("pending", []),
+            "expires_in": e.payload.get("expires_in"),
+        })
+    except AgentRunLimitError as e:
+        return error(42901, f"运行超限：{e}", status=429)
     except Exception as e:
         return error(50001, f"模型调用失败：{e}", status=500)
     finally:
@@ -227,6 +290,7 @@ async def _run_agent_turn(
     question: str,
     answer_buf: list[str],
     tools_used: list[str],
+    state_out: dict,
     llm=None,
     replay: bool = False,
 ):
@@ -237,6 +301,13 @@ async def _run_agent_turn(
     replay=True：不重复塞 human，续跑线程里已 checkpoint 的模型节点（fallback 用，见下方重试）。
     """
     agent = build_agent(allowed_doc_ids, checkpointer=saver, llm=llm)
+    config = _agent_config(conversation_id)
+    if not replay:
+        # 同非流式：有未审批操作时先返回待审批，不把新问题塞进悬空 tool_call 的历史
+        pending = _interrupt_payload(await agent.aget_state(config))
+        if pending is not None:
+            state_out["interrupted"] = pending
+            return
     # 长会话压缩（37）：astream 前的同步动作也走压缩，AsyncSqliteSaver 用 aget_state/aupdate_state
     if not replay:
         await amaybe_compress_thread(agent, conversation_id, llm=llm)
@@ -249,7 +320,7 @@ async def _run_agent_turn(
     # 还是在跑工具，分别路由成 content 事件和 tool_start/tool_end 事件。
     async for msg, meta in agent.astream(
         inputs,
-        config=_agent_config(conversation_id),
+        config=config,
         stream_mode="messages",
     ):
         node = (meta or {}).get("langgraph_node")
@@ -285,6 +356,12 @@ async def _run_agent_turn(
         usage_rec.record_usage_meta(pending_um)
     if usage_rec is not None:
         usage_rec.tool_calls = len(tools_used)
+    # 流在工具执行前被审批 hook 挂起：messages 模式不会把 interrupt 当消息吐出来，
+    # 流结束后从 checkpoint 快照里取，交给调用方发 awaiting_approval 而不是 done。
+    snapshot = await agent.aget_state(config)
+    payload = _interrupt_payload(snapshot)
+    if payload is not None:
+        state_out["interrupted"] = payload
 
 
 async def _agent_stream(
@@ -300,15 +377,18 @@ async def _agent_stream(
         yield sse_event("meta", {"conversation_id": conversation_id, "trace_id": trace_id})
         answer_buf: list[str] = []
         tools_used: list[str] = []
+        state_out: dict = {}
         # async astream 必须配 async checkpointer；同一 sqlite 文件，会话记忆照常跨请求。
         async with open_async_checkpointer() as saver:
             delivered = False  # 是否已吐过内容/tool 事件（meta 除外）
             try:
                 async for ev in _run_agent_turn(
-                    saver, allowed_doc_ids, conversation_id, question, answer_buf, tools_used
+                    saver, allowed_doc_ids, conversation_id, question, answer_buf, tools_used, state_out
                 ):
                     delivered = True
                     yield ev
+            except AgentRunLimitError:
+                raise  # 护栏熔断不能 fallback 重试
             except Exception:
                 # 主供应商在吐任何内容前就失败（连接级错误）且配了备份：续跑一轮。
                 # 已吐过事件后不能重试（客户端已看到前半段）；此刻失败必在首个模型节点、
@@ -326,16 +406,119 @@ async def _agent_stream(
                     question,
                     answer_buf,
                     tools_used,
+                    state_out,
                     llm=backup,
                     replay=True,
                 ):
                     yield ev
+        if state_out.get("interrupted"):
+            payload = state_out["interrupted"]
+            session_row.last_active_at = _now_utc()
+            db.commit()
+            yield sse_event("awaiting_approval", {
+                "conversation_id": conversation_id,
+                "pending": payload.get("pending", []),
+                "expires_in": payload.get("expires_in"),
+            })
+            return
         answer = "".join(answer_buf)
         log_answer(question, answer)
         session_row.last_active_at = _now_utc()
         db.commit()
         yield sse_event("done", {"answer": answer, "tools": tools_used})
+    except AgentRunLimitError as e:
+        yield sse_event("error", {"message": f"运行超限：{e}", "code": 42901})
     except Exception as e:
         yield sse_event("error", {"message": f"模型调用失败：{e}"})
+    finally:
+        end_trace(token)
+
+
+@router.post("/approve", summary="人工审批：批准/拒绝/改参数后从 checkpoint 继续运行")
+def agent_approve(
+    req: ApprovalRequest,
+    user: UserContext = Depends(enforce_quota),
+    db: Session = Depends(get_db),
+):
+    """HITL 恢复入口：同一个 conversation_id 续跑被 interrupt 挂起的线程。
+
+    缺失的决策和超时一律按拒绝处理（fail-closed）；恢复后若又撞上下一个外部工具，
+    继续返回 awaiting_approval，前端再审批一次。
+    """
+    conversation_id = req.conversation_id.strip()
+    if not conversation_id:
+        return error(40001, "conversation_id 不能为空")
+    row = db.execute(
+        select(ChatSession).where(
+            ChatSession.owner_id == user.user_id, ChatSession.id == conversation_id
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        return error(40002, "会话不存在或无权访问")
+    allowed, err = _resolve_scope(db, user, req.doc)
+    if err is not None:
+        return err
+
+    token = begin_trace(source="agent", conversation_id=conversation_id)
+    try:
+        with open_sync_checkpointer() as saver:
+            agent = build_agent(allowed, checkpointer=saver)
+            config = _agent_config(conversation_id)
+            snap = agent.get_state(config)
+            payload = _interrupt_payload(snap)
+            if payload is None:
+                return error(40003, "当前没有待审批的操作（可能已处理或会话未暂停）")
+
+            pending = payload.get("pending", [])
+            expired = _approval_expired(payload)
+            given = {} if expired else {d.tool_call_id: d for d in req.decisions}
+            decisions: dict[str, dict] = {}
+            for call in pending:
+                d = given.get(call["tool_call_id"])
+                kind = d.type if d is not None else "reject"
+                if kind == "edit" and (d is None or d.args is None):
+                    kind = "reject"  # 说改参数却没给参数：按拒绝兜底
+                decisions[call["tool_call_id"]] = {"type": kind}
+                if kind == "edit":
+                    decisions[call["tool_call_id"]]["args"] = d.args
+                audit_record(
+                    db, user, "agent.approve", call["tool_call_id"],
+                    f"{call.get('name')}:{kind}{'（超时自动拒绝）' if expired else ''}",
+                )
+
+            prior_len = len(list((snap.values or {}).get("messages") or []))
+            with span("agent.approve"):
+                result = agent.invoke(
+                    Command(resume={"decisions": decisions}), config=config
+                )
+            next_payload = _interrupt_payload(result)
+            row.last_active_at = _now_utc()
+            db.commit()
+            if next_payload is not None:
+                return ok({
+                    "conversation_id": conversation_id,
+                    "status": "awaiting_approval",
+                    "pending": next_payload.get("pending", []),
+                    "expires_in": next_payload.get("expires_in"),
+                })
+
+            messages = result["messages"]
+            answer = messages[-1].content
+            new_msgs = messages[prior_len:]
+            tools_used = [m.name for m in new_msgs if getattr(m, "type", "") == "tool"]
+            _count_usage_from_messages(new_msgs, tool_count=len(tools_used))
+            if req.question:
+                log_answer(req.question, answer)
+            return ok({
+                "conversation_id": conversation_id,
+                "status": "done",
+                "answer": answer,
+                "tools": tools_used,
+                "expired": expired,
+            })
+    except AgentRunLimitError as e:
+        return error(42901, f"运行超限：{e}", status=429)
+    except Exception as e:
+        return error(50001, f"审批恢复失败：{e}", status=500)
     finally:
         end_trace(token)
