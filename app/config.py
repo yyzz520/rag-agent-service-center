@@ -92,6 +92,17 @@ class Settings(BaseSettings):
     agent_approval_enabled: bool = True
     agent_approval_timeout: int = 300
 
+    # 单轮上下文预算：长任务/大工具结果不能把窗口顶爆。超长工具结果先落盘再截断，
+    # 本轮工具结果总量仍超预算时把更早的结果进一步压缩（最近 N 条保留）。
+    agent_max_context_chars: int = 60000
+    agent_tool_result_max_chars: int = 12000
+    agent_tool_result_keep_recent: int = 2
+    agent_tool_result_dir: str = "data/agent_tool_results"
+
+    # 危险工具执行台账（幂等）：按 conversation_id + tool_call_id 记录"已提交执行"，
+    # 崩溃/重放时不再重复执行（at-most-once，宁可漏执行让人复核，不重复副作用）。
+    agent_exec_ledger_path: str = "data/agent_tool_executions.db"
+
     # ---- 外部 MCP 工具（M5）----
     # 空 = 不接外部工具（默认，保证零配置能跑）。填 JSON 才启用，形如：
     #   {"wms":{"command":"python","args":["-m","mcp_servers.wms_server"],"transport":"stdio"}}

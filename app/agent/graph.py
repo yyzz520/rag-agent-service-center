@@ -17,7 +17,7 @@ from app.agent.tools import calculator, make_search_knowledge_base_tool
 from app.ai.providers import backup_llm, primary_llm
 from app.config import settings
 from app.rag.prompts import get_prompt
-from app.rag.trace import current_usage
+from app.rag.trace import current_trace_id, current_usage
 
 logger = logging.getLogger("app.agent.graph")
 
@@ -116,6 +116,7 @@ def build_agent(
     *,
     checkpointer=None,
     llm=None,
+    conversation_id: str | None = None,
 ):
     """按请求作用域现拼一个 agent（每请求一个，工具闭包绑定 allowed_doc_ids，隔离不靠 ContextVar）。
 
@@ -130,15 +131,17 @@ def build_agent(
                 "postgres 档必须显式传入 checkpointer（用 open_sync_checkpointer() 获取）"
             )
         checkpointer = get_checkpointer()
+    # scope 用于工具结果落盘目录和执行台账的键：同一个会话/线程内稳定
+    scope = conversation_id or current_trace_id() or "no-scope"
     return create_react_agent(
         llm or get_agent_llm(),
         _scope_tools(allowed_doc_ids),
         prompt=_AGENT_SYSTEM,
         checkpointer=checkpointer,
-        # 每次模型调用前做业务级熔断；模型产出工具调用后、执行前做人工审批。
-        # 两者都在 harness 层，工具实现本身不感知。
-        pre_model_hook=make_pre_model_hook(),
-        post_model_hook=make_approval_hook(),
+        # 每次模型调用前：业务级熔断 + 上下文预算；模型产出工具调用后、执行前：人工审批。
+        # 都在 harness 层，工具实现本身不感知。
+        pre_model_hook=make_pre_model_hook(scope=scope),
+        post_model_hook=make_approval_hook(scope),
     )
 
 

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from langchain_core.messages import AIMessage
 
+from app.agent.context_budget import apply_budget
 from app.config import settings
 
 
@@ -85,12 +86,15 @@ def check_run(messages: list, started_at: float, limits: RunLimits | None = None
         raise AgentRunLimitError(f"本次运行 token 超过 {limits.max_tokens} 上限，已终止")
 
 
-def make_pre_model_hook(limits: RunLimits | None = None):
-    """在每次模型调用前检查；started_at 按"一轮用户请求"计时（审批恢复会重新计时）。"""
+def make_pre_model_hook(limits: RunLimits | None = None, scope: str | None = None):
+    """每次模型调用前：先做业务熔断，再按预算截断/外置超长工具结果。"""
     started_at = time.monotonic()
 
     def hook(state):
-        check_run(state.get("messages") or [], started_at, limits)
+        messages = state.get("messages") or []
+        check_run(messages, started_at, limits)
+        if scope:
+            return apply_budget(messages, scope)
         return None
 
     return hook

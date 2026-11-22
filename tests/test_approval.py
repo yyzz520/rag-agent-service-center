@@ -2,11 +2,18 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.tools import tool
+import pytest
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 from langgraph.types import Command
 
 from app.agent import approval
+from app.config import settings
+
+
+@pytest.fixture(autouse=True)
+def _temp_ledger(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "agent_exec_ledger_path", str(tmp_path / "ledger.db"))
 
 
 def _ai(calls: list[dict]) -> AIMessage:
@@ -48,6 +55,23 @@ def test_hook_approves_edits_and_auto_passes_local(monkeypatch):
     assert isinstance(rewritten, AIMessage)
     assert [c["args"] for c in rewritten.tool_calls] == [{"x": "a"}, {"x": "edited"}, {"expression": "1+1"}]
     assert not any(isinstance(m, ToolMessage) for m in out["messages"])
+
+
+def test_hook_skips_replay_of_executed_call(monkeypatch):
+    monkeypatch.setattr(approval, "interrupt", lambda payload: {
+        "decisions": {"c1": {"type": "approve"}},
+    })
+    state = {"messages": [HumanMessage("q"), _ai([
+        {"id": "c1", "name": "mcp_write", "args": {"x": "a"}},
+    ])]}
+    hook = approval.make_approval_hook("scope-replay")
+
+    assert hook(state) is None  # 首次：批准并落台账，工具交给 ToolNode 执行
+    replay = hook(state)  # 模拟崩溃后重放同一状态
+
+    tool_msgs = [m for m in replay["messages"] if isinstance(m, ToolMessage)]
+    assert len(tool_msgs) == 1
+    assert "此前已提交执行" in tool_msgs[0].content
 
 
 def test_hook_missing_decision_fails_closed(monkeypatch):

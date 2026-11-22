@@ -8,12 +8,14 @@
 多副本、重启后都能用同一个 thread_id 续跑，审批结果由 /agent/approve 以
 `Command(resume=...)` 送回。
 """
+import json
 import logging
 from datetime import datetime, timezone
 
 from langchain_core.messages import AIMessage, RemoveMessage, ToolMessage
 from langgraph.types import interrupt
 
+from app.agent import execution_ledger
 from app.config import settings
 
 logger = logging.getLogger("app.agent.approval")
@@ -22,6 +24,7 @@ logger = logging.getLogger("app.agent.approval")
 LOCAL_READ_ONLY_TOOLS = frozenset({"search_knowledge_base", "calculator"})
 
 _REJECT_CONTENT = "人工审批未通过，该工具未执行。请基于已有信息继续，或说明无法完成。"
+_REPEAT_CONTENT = "该工具调用此前已提交执行（幂等保护），本次不再重复执行；请人工复核上一次执行结果。"
 
 
 class AgentAwaitingApproval(Exception):
@@ -43,8 +46,22 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def make_approval_hook():
-    """post_model_hook：模型刚产出 tool_calls、工具还没执行——这是唯一的自然审批点。"""
+def _mark_executed(scope: str, call: dict) -> bool:
+    """执行前落账；返回 False = 同一 tool_call_id 已执行过（重放），本次应跳过。"""
+    return execution_ledger.mark_executed(
+        scope,
+        call["id"],
+        call.get("name", ""),
+        json.dumps(call.get("args") or {}, ensure_ascii=False, sort_keys=True),
+    )
+
+
+def make_approval_hook(scope: str = "no-scope"):
+    """post_model_hook：模型刚产出 tool_calls、工具还没执行——这是唯一的自然审批点。
+
+    审批通过的危险工具在执行前落执行台账（at-most-once）；崩溃/重放时同一
+    tool_call_id 不再执行，避免重复副作用。
+    """
 
     def hook(state):
         messages = state.get("messages") or []
@@ -79,11 +96,27 @@ def make_approval_hook():
                 new_calls.append(call)
                 continue
             decision = (by_id.get(call["id"]) or {}).get("type")
+            edit_args = (by_id.get(call["id"]) or {}).get("args")
+            if decision == "edit" and not isinstance(edit_args, dict):
+                decision = "reject"  # 说改参数却没给参数，按拒绝兜底
+            executed = False
             if decision == "approve":
-                new_calls.append(call)
-            elif decision == "edit" and isinstance((by_id.get(call["id"]) or {}).get("args"), dict):
-                new_calls.append({**call, "args": by_id[call["id"]]["args"]})
-            else:
+                executed = _mark_executed(scope, call)
+                if executed:
+                    new_calls.append(call)
+            elif decision == "edit":
+                edited = {**call, "args": edit_args}
+                executed = _mark_executed(scope, edited)
+                if executed:
+                    new_calls.append(edited)
+            if decision in ("approve", "edit") and not executed:
+                # 同一 tool_call_id 已执行过（崩溃/重放）：at-most-once，不重复副作用
+                updates.append(ToolMessage(
+                    content=_REPEAT_CONTENT,
+                    tool_call_id=call["id"],
+                    name=call.get("name"),
+                ))
+            elif decision not in ("approve", "edit"):
                 # 缺失/超时/拒绝一律按拒绝处理（fail-closed），把结果作为工具消息回给模型
                 updates.append(ToolMessage(
                     content=_REJECT_CONTENT,

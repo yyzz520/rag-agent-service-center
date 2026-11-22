@@ -154,7 +154,9 @@ def _invoke_agent(
     with open_sync_checkpointer() as saver:
         if replay_check and not replay:
             replay = _thread_has_pending_question(saver, conversation_id, question)
-        agent = build_agent(allowed_doc_ids, checkpointer=saver, llm=llm)
+        agent = build_agent(
+            allowed_doc_ids, checkpointer=saver, llm=llm, conversation_id=conversation_id
+        )
         # 长会话压缩（37）：新的一轮开始前若线程历史超阈值，先把更早消息折成摘要（replay 不重复压）
         if not replay:
             maybe_compress_thread(agent, conversation_id, llm=llm)
@@ -300,7 +302,9 @@ async def _run_agent_turn(
     llm 传备份供应商时重建 agent，checkpointer 复用同一个 saver，会话记忆不丢。
     replay=True：不重复塞 human，续跑线程里已 checkpoint 的模型节点（fallback 用，见下方重试）。
     """
-    agent = build_agent(allowed_doc_ids, checkpointer=saver, llm=llm)
+    agent = build_agent(
+        allowed_doc_ids, checkpointer=saver, llm=llm, conversation_id=conversation_id
+    )
     config = _agent_config(conversation_id)
     if not replay:
         # 同非流式：有未审批操作时先返回待审批，不把新问题塞进悬空 tool_call 的历史
@@ -462,7 +466,7 @@ def agent_approve(
     token = begin_trace(source="agent", conversation_id=conversation_id)
     try:
         with open_sync_checkpointer() as saver:
-            agent = build_agent(allowed, checkpointer=saver)
+            agent = build_agent(allowed, checkpointer=saver, conversation_id=conversation_id)
             config = _agent_config(conversation_id)
             snap = agent.get_state(config)
             payload = _interrupt_payload(snap)

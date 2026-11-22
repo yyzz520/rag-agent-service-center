@@ -21,6 +21,8 @@ flowchart TD
 |---|---|---|
 | Agent 循环 | LangGraph `create_react_agent` | `recursion_limit` 兜底熔断；模型输出最终答案才停 |
 | 运行熔断 | `pre_model_hook` 读本轮消息 | 业务口径四道硬上限：工具轮数 / 连续相同调用 / 耗时 / token；超限抛 `AgentRunLimitError`，返回 429，不触发 fallback |
+| 上下文预算 | `pre_model_hook` + 工具结果外置 | 超长工具结果原文落盘后截断；本轮总量仍超预算时压缩更早结果（最近 N 条保留）；只改正文，不破 tool_call 配对 |
+| 执行幂等 | 危险工具执行台账（SQLite） | 执行前按 `conversation_id + tool_call_id` 落账；崩溃/重放不再重复执行（at-most-once，宁可漏执行等人工复核） |
 | 人工审批（HITL） | `post_model_hook` + `interrupt()` | 模型产出 tool_calls 后、执行前暂停；`/agent/approve` 批准/拒绝/改参数后从 checkpoint 续跑；超时/缺失审批 fail-closed；决策落审计日志 |
 | 工具注册 | LangChain `@tool` + MCP | 工具名/描述/参数给模型；检索工具按请求闭包绑定文档范围 |
 | 工具防重 | 检索工具内 `seen` dict | 同一轮重复 query 复用上次结果；计算器故意不做（纯函数、零副作用） |
@@ -62,6 +64,8 @@ flowchart TD
 ## 4. 边界与扩展
 
 本项目是**个人服务层技术验证**，不覆盖平台层：多租户平台管理、工作流画布、Skills 市场、沙箱、子智能体编排不在范围。HITL 只做了工具级审批（暂停/批准/拒绝/改参），平台级审批流（会签、审批中心、超时升级）不做。
+
+上下文治理的边界也要说清：harness 做的是"单轮工具结果预算 + 外置"，**长报告分段生成属于业务层**（大纲 → 分节生成 → 每节落库 → 下一节只带大纲和摘要），不在这个 repo 里；checkpoint 只保证可恢复，不减少再次喂给模型的上下文。执行台账按 `tool_call_id` 做 at-most-once，**跨系统的端到端幂等**仍需下游支持幂等键。
 
 ## 5. 一句话
 

@@ -104,7 +104,7 @@ def _run_task(task: dict) -> dict:
     token = begin_trace(source="agent_eval", conversation_id=conv)
     try:
         with open_sync_checkpointer() as saver:
-            agent = build_agent(allowed, checkpointer=saver)
+            agent = build_agent(allowed, checkpointer=saver, conversation_id=conv)
             config = {
                 "configurable": {"thread_id": conv},
                 "recursion_limit": settings.agent_recursion_limit,
