@@ -67,7 +67,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(
-    title="企业 AI 智能中台 · RAG + Agent 服务中心",
+    title="企业级 AI 智能中台 · RAG + Agent 服务中心",
     description="以文档为业务对象的 RAG 知识库 + LangGraph 智能体能力层："
     "JWT 鉴权 · 多租户隔离 · 元数据落库 · 会话持久化 · SSE 流式输出 · "
     "多格式解析（txt/md/pdf/docx/xlsx，扫描件自动走 MinerU OCR）",
