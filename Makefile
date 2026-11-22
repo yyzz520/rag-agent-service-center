@@ -2,13 +2,15 @@ PYTHON ?= .venv/bin/python
 
 .PHONY: venv install install-dev test lint verify run
 
-venv:
+.venv:
 	python3 -m venv .venv
 
-install: venv
+venv: .venv
+
+install: .venv
 	$(PYTHON) -m pip install -r requirements.txt
 
-install-dev: venv
+install-dev: .venv
 	$(PYTHON) -m pip install -r requirements-dev.txt
 
 test:

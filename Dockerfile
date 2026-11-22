@@ -14,6 +14,10 @@ COPY app ./app
 COPY mcp_servers ./mcp_servers
 COPY healthcheck.py .
 
+# 非 root 运行：容器内进程不拿 root，降低被利用后的权限面
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
 # 与 config.port 默认值 8200 对齐；docker-compose 也映射 ${PORT:-8200}
 EXPOSE 8200
 

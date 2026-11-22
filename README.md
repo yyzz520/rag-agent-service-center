@@ -94,6 +94,16 @@ python3 -m venv .venv
 
 </details>
 
+## 开发与验证
+
+```bash
+make install-dev   # 建 .venv 并安装运行 + 测试依赖
+make verify        # ruff + pytest，提交前必跑
+make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
+```
+
+`make verify` 不依赖外部服务/API Key；评测相关测试只测纯函数和指标聚合，不调模型。
+
 ## 评测（怎么证明有效）
 
 | 评测 | 跑什么 | 成本 | 指标 |
@@ -122,6 +132,7 @@ python3 -m venv .venv
 - [设计与取舍（分布式组件、已知边界）](docs/design.md)
 - [评测说明（三层评测、指标口径、已知边界）](docs/evaluation.md)
 - [架构决策记录（RRF / 存储 / 多副本）](docs/adr/)
+- [变更记录](CHANGELOG.md) · [贡献指南](CONTRIBUTING.md)
 
 ## License
 

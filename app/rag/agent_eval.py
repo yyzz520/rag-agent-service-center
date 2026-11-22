@@ -6,7 +6,7 @@
 不是来自"跑得多"。同题多跑看稳定性这轮不做（成本 ×N），作为已知缺口记在文档里。
 
 与线上会话完全隔离：每个任务用一次性 thread_id，跑完即弃，不碰任何真实会话的 checkpointer。
-检索结果缓存照常生效（只缓检索、工具仍会被真实调用），所以不会扭曲"工具路由"这个指标。
+检索缓存也整体 bypass，保证评测打的是真实链路；工具仍会被真实调用。
 """
 import json
 import time
@@ -17,6 +17,7 @@ from langchain_core.messages import HumanMessage
 
 from app.agent.graph import build_agent, open_sync_checkpointer
 from app.config import settings
+from app.rag import cache
 from app.rag.trace import begin_trace, current_usage, end_trace, rotate_jsonl_if_needed
 
 EVAL_DIR = Path(settings.persist_dir).parent / "eval"  # data/eval，与 RAG 评测同目录
@@ -54,8 +55,10 @@ def _run_task(task: dict) -> dict:
                 "configurable": {"thread_id": conv},
                 "recursion_limit": settings.agent_recursion_limit,
             }
-            # 全新线程：invoke 返回的消息就是本轮全部消息，不需要像线上那样切尾部
-            result = agent.invoke({"messages": [HumanMessage(content=question)]}, config=config)
+            # 全新线程：invoke 返回的消息就是本轮全部消息，不需要像线上那样切尾部。
+            # bypass 检索缓存：评测要打真实检索链路，缓存命中会让结果偏乐观且不可复现。
+            with cache.bypass():
+                result = agent.invoke({"messages": [HumanMessage(content=question)]}, config=config)
             messages = result["messages"]
             answer = _text(messages[-1])
             tools_used = [m.name for m in messages if getattr(m, "type", "") == "tool"]
