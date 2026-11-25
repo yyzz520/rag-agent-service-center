@@ -1,9 +1,13 @@
 name: ci
 
+# 临时改为手动触发：账户 billing 授权失败时 Actions 任务无法启动，
+# 自动触发只会产生失败邮件和红叉。账单恢复后改回：
+# on:
+#   push:
+#     branches: [main]
+#   pull_request:
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
