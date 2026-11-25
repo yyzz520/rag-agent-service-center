@@ -118,6 +118,12 @@ make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
 
 `make verify` 不依赖外部服务/API Key；评测相关测试只测纯函数和指标聚合，不调模型。
 
+## Agent Skills（可复用技能封装）
+
+- `.claude/skills/enterprise-kb-qa/`：企业知识库问答，含引用/拒答契约与失败处理
+- `.claude/skills/warehouse-batch-status/`：仓储批号状态查询，走 MCP 外部工具 + 人工审批
+- Skill 与 Prompt/Tool 的区别、调用链、输出契约和评测依据见 [Skill 案例](docs/skill-case.md)
+
 ## 评测（怎么证明有效）
 
 | 评测 | 跑什么 | 成本 | 指标 |
