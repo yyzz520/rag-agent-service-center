@@ -256,18 +256,14 @@ main { max-width: none; margin: 0; padding: 0; }
   gap: 14px;
   box-shadow: var(--shadow);
 }
-.messages:empty {
-  justify-content: center;
-  align-items: center;
-}
-.messages:empty::after {
-  content: "从下面的示例问题开始\n支持引用溯源、外部工具审批、多步计划执行";
-  white-space: pre-line;
+.empty-state {
+  margin: auto;
   text-align: center;
   color: #94a3b8;
-  font-size: 13px;
-  line-height: 1.9;
+  max-width: 360px;
 }
+.empty-state strong { display: block; color: var(--ink-2); font-size: 14px; margin-bottom: 4px; }
+.empty-state p { margin: 0; font-size: 12px; line-height: 1.7; }
 
 .msg { display: flex; flex-direction: column; max-width: 90%; animation: rise .18s ease-out; }
 @keyframes rise { from { opacity: 0; transform: translateY(4px); } }
@@ -462,3 +458,47 @@ code { background: #eef2ff; padding: 1px 5px; border-radius: 4px; }
   animation: blink 1s steps(2, start) infinite;
 }
 @keyframes blink { 50% { opacity: 0; } }
+
+/* ---------- 首屏概览 ---------- */
+.overview {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+.overview[hidden] { display: none; }
+.overview-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.overview-head h2 { margin: 0; font-size: 14px; }
+.overview-head p { margin: 0; color: var(--muted); font-size: 12px; }
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.scenario {
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.scenario:hover {
+  border-color: #bfdbfe;
+  box-shadow: 0 8px 20px rgba(29, 78, 216, .08);
+  transform: translateY(-1px);
+}
+.scenario-k { font-size: 11px; color: var(--brand); font-weight: 600; letter-spacing: .02em; }
+.scenario strong { font-size: 14px; color: var(--ink); }
+.scenario p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.6; }
+.scenario em { font-style: normal; font-size: 12px; color: var(--brand); margin-top: 4px; }
+
+@media (max-width: 900px) {
+  .overview-grid { grid-template-columns: 1fr; }
+}

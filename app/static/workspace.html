@@ -21,9 +21,8 @@
   </header>
 
   <div class="statusbar">
-    <span class="pill">路由评测 14/14</span>
-    <span class="pill">计划执行 5/5</span>
-    <span class="pill">123 pytest</span>
+    <span class="pill">合成数据环境</span>
+    <span class="pill">服务就绪</span>
     <span class="pill" id="traceId">trace: —</span>
   </div>
 
@@ -46,13 +45,42 @@
       </ol>
 
       <h2>评测快照</h2>
-      <div class="mini-row"><span>路由</span><b>14/14</b></div>
-      <div class="mini-row"><span>计划执行</span><b>5/5</b></div>
+      <div class="mini-row"><span>检索 MRR</span><b id="miniMrr">—</b></div>
+      <div class="mini-row"><span>生成正确率</span><b id="miniCorrect">—</b></div>
+      <div class="mini-row"><span>路由准确率</span><b id="miniRouterAcc">—</b></div>
+      <div class="mini-row"><span>计划成功率</span><b id="miniPlanSuccess">—</b></div>
       <div class="mini-row"><span>pytest</span><b>123</b></div>
-      <p class="side-note">查看完整指标请切到「评测数据」页签（需管理员）。</p>
+      <p class="side-note">登录后自动读取最近一次评测；完整数据见「评测数据」页签。</p>
     </aside>
 
     <div class="content">
+      <section id="overview" class="overview">
+        <div class="overview-head">
+          <h2>三个可验证的场景</h2>
+          <p>选一个开始，或直接在下面页签里提问。</p>
+        </div>
+        <div class="overview-grid">
+          <button class="scenario" data-scenario="rag">
+            <span class="scenario-k">01 · 知识库问答</span>
+            <strong>引用与拒答</strong>
+            <p>问 SOP / 制度，答案带 [n] 来源；资料不足直接拒答。</p>
+            <em>试一下</em>
+          </button>
+          <button class="scenario" data-scenario="agent">
+            <span class="scenario-k">02 · 外部工具审批</span>
+            <strong>批号状态与放行</strong>
+            <p>查批号/批记录/偏差；写操作先暂停，人工批准或拒绝。</p>
+            <em>试一下</em>
+          </button>
+          <button class="scenario" data-scenario="plan">
+            <span class="scenario-k">03 · 多步计划执行</span>
+            <strong>合规核对</strong>
+            <p>查系统 + 查规范 + 判断合规；计划先批，再逐步执行。</p>
+            <em>试一下</em>
+          </button>
+        </div>
+      </section>
+
       <nav class="tabs">
         <button class="tab-btn active" data-tab="rag">知识库问答</button>
         <button class="tab-btn" data-tab="agent">智能体与审批</button>
@@ -67,7 +95,9 @@
             <button data-q="偏差按影响程度分成哪几级？">偏差分级</button>
             <button data-q="清源缓释片治疗糖尿病的最佳剂量是多少？">负样本（应拒答）</button>
           </div>
-          <div id="ragMessages" class="messages"></div>
+          <div id="ragMessages" class="messages">
+            <div class="empty-state"><strong>还没有提问</strong><p>点击上方示例问题，或直接输入文档相关问题。</p></div>
+          </div>
           <form id="ragForm" class="composer">
             <input id="ragInput" placeholder="问文档 / 制度 / SOP…" autocomplete="off">
             <button type="submit">发送</button>
@@ -84,7 +114,9 @@
             <button id="newAgent" class="ghost">新会话</button>
             <span class="muted">外部工具执行前会暂停，等待批准 / 拒绝</span>
           </div>
-          <div id="agentMessages" class="messages"></div>
+          <div id="agentMessages" class="messages">
+            <div class="empty-state"><strong>还没有对话</strong><p>试试查批号，或发起一次需要审批的放行操作。</p></div>
+          </div>
           <form id="agentForm" class="composer">
             <input id="agentInput" placeholder="问实时状态 / 发起写操作…" autocomplete="off">
             <button type="submit">发送</button>
@@ -100,7 +132,9 @@
             <button id="newPlan" class="ghost">新计划</button>
             <span class="muted">先生成计划，人工批准后逐步执行</span>
           </div>
-          <div id="planMessages" class="messages"></div>
+          <div id="planMessages" class="messages">
+            <div class="empty-state"><strong>还没有计划</strong><p>描述一个多步任务，先生成计划，再批准执行。</p></div>
+          </div>
           <form id="planForm" class="composer">
             <input id="planInput" placeholder="描述一个多步任务…" autocomplete="off">
             <button type="submit">生成计划</button>

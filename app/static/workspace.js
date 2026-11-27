@@ -67,9 +67,12 @@ async function login() {
       (data.user.role === "admin" ? "管理员" : data.user.role) +
       " · " + data.user.tenant_id,
   });
+  loadMiniEval().catch(() => {});
 }
 
 function addMsg(container, role, text, meta) {
+  const empty = container.querySelector(".empty-state");
+  if (empty) empty.remove();
   const wrap = document.createElement("div");
   wrap.className = "msg " + role;
   const bubble = document.createElement("div");
@@ -189,8 +192,37 @@ function scrollBottom(container) {
   container.scrollTop = container.scrollHeight;
 }
 
+function hideOverview() {
+  const el = $("overview");
+  if (el) el.hidden = true;
+}
+
+function switchTab(name) {
+  document.querySelectorAll(".tab-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.tab === name);
+  });
+  document.querySelectorAll(".tab").forEach((s) => {
+    s.classList.toggle("active", s.id === "tab-" + name);
+  });
+  if (name === "eval") loadEval();
+}
+
+function showEmpty(container, title, hint) {
+  container.innerHTML = "";
+  const div = document.createElement("div");
+  div.className = "empty-state";
+  const strong = document.createElement("strong");
+  strong.textContent = title;
+  const p = document.createElement("p");
+  p.textContent = hint;
+  div.appendChild(strong);
+  div.appendChild(p);
+  container.appendChild(div);
+}
+
 // ---- 知识库问答（流式）----
 async function sendRag(q) {
+  hideOverview();
   const box = $("ragMessages");
   addMsg(box, "user", q);
   setPhase(0);
@@ -233,6 +265,7 @@ async function sendRag(q) {
 
 // ---- 智能体 + 审批（流式）----
 async function sendAgent(q) {
+  hideOverview();
   const box = $("agentMessages");
   addMsg(box, "user", q);
   setPhase(0);
@@ -387,6 +420,7 @@ async function decideAgent(d, type, buttons) {
 
 // ---- 计划任务 ----
 async function sendPlan(q) {
+  hideOverview();
   const box = $("planMessages");
   addMsg(box, "user", q);
   setPhase(0);
@@ -505,17 +539,49 @@ function renderSteps(wrap, steps) {
 }
 
 // ---- 评测数据 ----
+async function fetchEval() {
+  return Promise.all([
+    apiGet("/eval/retrieval"),
+    apiGet("/eval/generation"),
+    apiGet("/eval/agent"),
+    apiGet("/eval/router"),
+    apiGet("/eval/plan"),
+  ]);
+}
+
+function fmt(v) {
+  return v === undefined || v === null ? "—" : Number(v).toFixed(3);
+}
+
+function metricOf(res, key) {
+  return res && res.latest && res.latest.metrics ? res.latest.metrics[key] : undefined;
+}
+
+function updateMini(data) {
+  const [ret, gen, router, plan] = data;
+  $("miniMrr").textContent = fmt(metricOf(ret, "mrr"));
+  $("miniCorrect").textContent = fmt(metricOf(gen, "correct_rate"));
+  $("miniRouterAcc").textContent = fmt(metricOf(router, "accuracy"));
+  $("miniPlanSuccess").textContent = fmt(metricOf(plan, "success_rate"));
+}
+
+async function loadMiniEval() {
+  try {
+    updateMini(await fetchEval());
+  } catch (e) {
+    ["miniMrr", "miniCorrect", "miniRouterAcc", "miniPlanSuccess"].forEach((id) => {
+      $(id).textContent = "—";
+    });
+  }
+}
+
 async function loadEval() {
   const box = $("evalCards");
   box.textContent = "加载中…";
   try {
-    const [ret, gen, agent, router, plan] = await Promise.all([
-      apiGet("/eval/retrieval"),
-      apiGet("/eval/generation"),
-      apiGet("/eval/agent"),
-      apiGet("/eval/router"),
-      apiGet("/eval/plan"),
-    ]);
+    const data = await fetchEval();
+    const [ret, gen, agent, router, plan] = data;
+    updateMini(data);
     const cards = [
       metricCard("检索（最近）", ret.latest && ret.latest.metrics, [
         ["recall@1", "recall@1"], ["recall@5", "recall@5"],
@@ -579,12 +645,17 @@ function metricCard(title, metrics, rows) {
 // ---- 交互绑定 ----
 function wire() {
   document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.onclick = () => switchTab(btn.dataset.tab);
+  });
+
+  document.querySelectorAll(".scenario").forEach((btn) => {
     btn.onclick = () => {
-      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".tab").forEach((s) => s.classList.remove("active"));
-      btn.classList.add("active");
-      $("tab-" + btn.dataset.tab).classList.add("active");
-      if (btn.dataset.tab === "eval") loadEval();
+      const s = btn.dataset.scenario;
+      hideOverview();
+      switchTab(s);
+      if (s === "rag") sendRag("冷藏库的温控要求是什么？");
+      else if (s === "agent") sendAgent("批号 QS-2024-9527 的库区、批记录和放行状态");
+      else sendPlan("查一下批号 QS-2024-9527 的库区和放行状态，再查知识库里冷藏库的温控要求，判断存放是否合规");
     };
   });
 
@@ -628,11 +699,11 @@ function wire() {
 
   $("newAgent").onclick = () => {
     state.agentConv = null;
-    $("agentMessages").innerHTML = "";
+    showEmpty($("agentMessages"), "还没有对话", "试试查批号，或发起一次需要审批的放行操作。");
   };
   $("newPlan").onclick = () => {
     state.planConv = null;
-    $("planMessages").innerHTML = "";
+    showEmpty($("planMessages"), "还没有计划", "描述一个多步任务，先生成计划，再批准执行。");
   };
   $("loadEval").onclick = () => loadEval();
 }
