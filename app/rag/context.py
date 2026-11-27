@@ -51,6 +51,7 @@ def expand_parents(docs: list[Document]) -> list[Document]:
             meta = dict(d.metadata)
             meta["chunk_level"] = "parent"
             meta["parent_id"] = pid
+            meta["chunk_id"] = (parent_meta or {}).get("chunk_id") or pid
             out.append(Document(page_content=content, metadata=meta))
             seen.add(pid)
         else:

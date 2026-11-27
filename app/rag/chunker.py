@@ -158,6 +158,11 @@ def _parent_id(meta: dict, path: str, index: int, text: str) -> str:
     return hashlib.md5(raw.encode("utf-8")).hexdigest()[:16]
 
 
+def _child_id(parent_id: str, index: int, text: str) -> str:
+    raw = f"child|{parent_id}|{index}|{text[:120]}"
+    return hashlib.md5(raw.encode("utf-8")).hexdigest()[:16]
+
+
 def chunk_documents(docs: list[Document]) -> list[Document]:
     """把 load_document 的结果切成 parent + child 两层。"""
     out: list[Document] = []
@@ -181,17 +186,19 @@ def chunk_documents(docs: list[Document]) -> list[Document]:
                         **base,
                         "chunk_level": "parent",
                         "parent_id": pid,
+                        "chunk_id": pid,  # 父块在向量库里的 ID = parent_id，扩展才能取到
                         "section_title": title,
                         "section_path": path,
                     },
                 ))
-                for child in _child_texts(ptext, title):
+                for ci, child in enumerate(_child_texts(ptext, title)):
                     out.append(Document(
                         page_content=child,
                         metadata={
                             **base,
                             "chunk_level": "child",
                             "parent_id": pid,
+                            "chunk_id": _child_id(pid, ci, child),
                             "section_title": title,
                             "section_path": path,
                         },

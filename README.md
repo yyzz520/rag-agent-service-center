@@ -112,7 +112,7 @@ make eval-plan     # Plan-and-Execute 窄场景：成功率/步数/token/耗时�
 make quality-report # 从 trace 聚合各阶段 p50/p95 耗时与 token 消耗（DAYS=7）
 make seed          # 启动服务后一键上传 samples/medical（已存在跳过）
 make seed-eval     # seed + 跑一次检索评测
-make reindex       # 按当前切块策略重建本地索引（父子块）
+make reindex       # 按当前切块策略重建本地索引（父子块；旧文档也会补上解析文本）
 make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
 ```
 

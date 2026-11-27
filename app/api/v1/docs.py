@@ -1,6 +1,9 @@
+import mimetypes
 import uuid
+from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Query, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -10,12 +13,13 @@ from app.core.quota import enforce_quota
 from app.core.security import UserContext, get_current_user
 from app.db import get_db
 from app.models import Doc
-from app.rag.vector_store import delete_by_doc_id
-from app.services.access import get_or_create_default_kb, owned_doc, owned_kb
+from app.rag.vector_store import delete_by_doc_id, get_vectorstore
+from app.services.access import get_or_create_default_kb, owned_doc, owned_kb, visible_doc
 from app.services.audit import record as audit_record
 from app.services.ingest import (
     delete_doc_files,
     parse_and_index,
+    read_parsed_text,
     sanitize_file_name,
     save_upload_file,
     sniff_content,
@@ -112,6 +116,67 @@ def doc_detail(doc_id: str, user: UserContext = Depends(get_current_user), db: S
     if doc is None:
         return error(40002, "文档不存在或无权访问")
     return ok(_serialize(doc))
+
+
+@router.get("/{doc_id}/parsed", summary="查看解析后的文本（排查解析/切块问题）")
+def doc_parsed(doc_id: str, user: UserContext = Depends(get_current_user), db: Session = Depends(get_db)):
+    doc = visible_doc(db, user, doc_id)
+    if doc is None:
+        return error(40002, "文档不存在或无权访问")
+    text = read_parsed_text(doc.id)
+    if text is None:
+        return ok({
+            "doc_id": doc.id, "available": False, "text": "", "chars": 0,
+            "hint": "旧文档未保留解析文本；重新入库或 make reindex 后可查看",
+        })
+    return ok({"doc_id": doc.id, "available": True, "text": text, "chars": len(text)})
+
+
+@router.get("/{doc_id}/chunks", summary="查看该文档的父/子块（排查切块问题）")
+def doc_chunks(doc_id: str, user: UserContext = Depends(get_current_user), db: Session = Depends(get_db)):
+    doc = visible_doc(db, user, doc_id)
+    if doc is None:
+        return error(40002, "文档不存在或无权访问")
+    raw = get_vectorstore().get(where={"doc_id": doc.id}, include=["documents", "metadatas"])
+    ids = raw.get("ids") or []
+    contents = raw.get("documents") or []
+    metas = raw.get("metadatas") or []
+    parents = {
+        m.get("parent_id"): c
+        for c, m in zip(contents, metas)
+        if m.get("chunk_level") == "parent"
+    }
+    items = []
+    for cid, content, meta in zip(ids, contents, metas):
+        item = {"id": cid, "content": content, "metadata": meta}
+        if meta.get("chunk_level") == "child":
+            item["parent_content"] = parents.get(meta.get("parent_id"))
+        items.append(item)
+    items.sort(key=lambda x: (
+        x["metadata"].get("chunk_level") != "parent",
+        x["metadata"].get("page") or 0,
+        x["id"],
+    ))
+    children = sum(1 for m in metas if m.get("chunk_level") == "child")
+    return ok({
+        "doc_id": doc.id,
+        "total": len(items),
+        "children": children,
+        "parents": len(parents),
+        "items": items,
+    })
+
+
+@router.get("/{doc_id}/source", summary="下载/预览原始文件（溯源对照）")
+def doc_source(doc_id: str, user: UserContext = Depends(get_current_user), db: Session = Depends(get_db)):
+    doc = visible_doc(db, user, doc_id)
+    if doc is None:
+        return error(40002, "文档不存在或无权访问")
+    path = Path(doc.storage_path)
+    if not path.exists():
+        return error(40002, "源文件不存在")
+    media, _ = mimetypes.guess_type(doc.file_name)
+    return FileResponse(path, media_type=media or "application/octet-stream")
 
 
 @router.delete("/{doc_id}", summary="删除文档：向量块 + 源文件 + 记录一起清")

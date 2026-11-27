@@ -74,6 +74,46 @@ def _sniff_ooxml(suffix: str, content: bytes) -> None:
         raise ValueError(f"文件内容不是有效的 Office 文档（缺少 {OOXML_MEMBER[suffix]}）")
 
 
+def parsed_text_path(doc_id: str) -> Path:
+    return Path(settings.persist_dir).parent / "parsed" / f"{doc_id}.txt"
+
+
+def build_parsed_text(loaded: list) -> str:
+    """把 loader 结果拼成可读文本：保留每页/每片段的边界，方便对照源文件。"""
+    parts = []
+    for i, d in enumerate(loaded, start=1):
+        page = d.metadata.get("page")
+        label = f"第 {page} 页" if page else f"片段 {i}"
+        parts.append(f"===== {label} =====\n{d.page_content}")
+    return "\n\n".join(parts)
+
+
+def write_parsed_text(doc_id: str, loaded: list) -> None:
+    try:
+        path = parsed_text_path(doc_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(build_parsed_text(loaded), encoding="utf-8")
+    except OSError:
+        pass  # 解析文本只是诊断辅助，落盘失败不影响入库
+
+
+def read_parsed_text(doc_id: str) -> str | None:
+    path = parsed_text_path(doc_id)
+    if not path.exists():
+        return None
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+
+def delete_parsed_text(doc_id: str) -> None:
+    try:
+        parsed_text_path(doc_id).unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def save_upload_file(doc: Doc, content: bytes) -> Path:
     """存到 uploads/{owner}/{doc_id}/{file_name}。doc_id 随机，天然不冲突、不覆盖。"""
     d = Path(settings.upload_dir) / doc.owner_id / doc.id
@@ -93,6 +133,7 @@ def delete_doc_files(doc: Doc) -> None:
         p.parent.rmdir()
     except OSError:
         pass
+    delete_parsed_text(doc.id)
 
 
 def parse_and_index(doc_id: str) -> None:
@@ -114,6 +155,7 @@ def parse_and_index(doc_id: str) -> None:
                 "user_id": doc.owner_id,
                 "kb_id": doc.kb_id,
             })
+        write_parsed_text(doc.id, loaded)
         chunks = chunk_documents(loaded)
         add_documents(chunks)
         doc.status = "ready"
@@ -126,6 +168,7 @@ def parse_and_index(doc_id: str) -> None:
     except Exception as e:
         db.rollback()
         delete_by_doc_id(doc_id)  # 半份向量清掉，不留脏数据
+        delete_parsed_text(doc_id)
         doc = db.get(Doc, doc_id)
         if doc is not None and doc.status == "parsing":
             doc.status = "failed"

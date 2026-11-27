@@ -40,6 +40,10 @@ def _format_sources(docs: list) -> tuple[str, list[dict]]:
         sources.append({
             "id": i,
             "chunk_id": chunk_id(d),
+            "vector_id": d.metadata.get("chunk_id"),
+            "doc_id": d.metadata.get("doc_id"),
+            "chunk_level": d.metadata.get("chunk_level"),
+            "parent_id": d.metadata.get("parent_id"),
             "source": src,
             "page": d.metadata.get("page"),
             "content": d.page_content,

@@ -34,8 +34,15 @@ def get_vectorstore() -> Chroma:
 
 
 def add_documents(docs: list[Document]) -> int:
-    ids = get_vectorstore().add_documents(docs)
-    return len(ids)
+    """优先用 chunker 给的稳定 chunk_id 当向量库 ID：
+    父块的 ID 必须等于 parent_id，expand_parents 才能按 parent_id 取回父块。"""
+    ids = [(d.metadata or {}).get("chunk_id") for d in docs]
+    store = get_vectorstore()
+    if ids and all(ids):
+        result = store.add_documents(docs, ids=ids)
+    else:
+        result = store.add_documents(docs)
+    return len(result)
 
 
 def get_retriever(k: int = 5, where: dict | None = None):

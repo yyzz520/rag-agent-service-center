@@ -15,6 +15,9 @@
 | POST | /api/v1/docs | 上传文档（multipart `file`，可带 `kb_id` 指定库）：.txt/.md/.pdf/.docx/.xlsx，默认上限 20MB，文件名消毒 + 内容嗅探防路径穿越/二进制冒充 |
 | GET | /api/v1/docs | 我的文档列表（可按 `kb_id`/`status` 过滤），doc_id 作 chat 的 `doc` 参数 |
 | GET | /api/v1/docs/{doc_id} | 文档详情：上传后轮询这个到 `ready`/`failed`（失败看 `error_msg`） |
+| GET | /api/v1/docs/{doc_id}/parsed | 查看解析后的文本（排查解析/切块问题；旧文档需 `make reindex` 后才有） |
+| GET | /api/v1/docs/{doc_id}/chunks | 查看父子块、`parent_id`、父块内容与元数据 |
+| GET | /api/v1/docs/{doc_id}/source | 预览/下载原始文件，供溯源对照 |
 | DELETE | /api/v1/docs/{doc_id} | 删文档：向量块 + 源文件 + 记录一起清 |
 | POST | /api/v1/rag/chat | RAG 问答（带 `[n]` 溯源，返回 sources）。body: `question`、`doc`（doc_id，限定单文档；留空 = 本人全库） |
 | POST | /api/v1/rag/chat/stream | RAG 流式（SSE）：`meta` → `content`(逐字) → `done`(答案+sources)；异常 → `error` |

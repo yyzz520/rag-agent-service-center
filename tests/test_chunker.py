@@ -24,6 +24,10 @@ def test_structure_chunking_builds_parents_and_children():
     assert len(parents) >= 2
     assert children
     assert all(c.metadata["parent_id"] in parent_ids for c in children)
+    assert all(p.metadata["chunk_id"] == p.metadata["parent_id"] for p in parents)
+    child_ids = {c.metadata["chunk_id"] for c in children}
+    assert len(child_ids) == len(children)
+    assert all(c.metadata["chunk_id"] != c.metadata["parent_id"] for c in children)
     assert any("召回分级" in p.page_content for p in parents)
     assert any("QS-1" in c.page_content and "批次" in c.page_content for c in children)
     assert all(len(c.page_content) <= 800 for c in children)
