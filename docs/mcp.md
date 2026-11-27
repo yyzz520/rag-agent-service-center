@@ -4,13 +4,15 @@
 
 知识库只能回答"文档里写过的东西"。而"某批号现在在哪个库区、是否已放行"这类**实时状态不在文档里**，必须调外部系统。MCP 的作用是**协议统一**：不管对端是 WMS、ERP 还是别的系统，agent 侧都走同一套 `读配置 → 握手加载 → 转成工具 → 交给模型` 流程，不用一家写一份适配。
 
-本项目自带一个示例外部系统 `mcp_servers/wms_server.py`（模拟仓储，暴露"查批号库位/状态"），配置一行即可挂进 agent：
+本项目自带一个示例外部系统 `mcp_servers/wms_server.py`（模拟制药企业仓储/质量系统，GMP 语境：批记录、偏差、QA 放行），配置一行即可挂进 agent：
 
 ```bash
 MCP_SERVERS_JSON={"wms":{"command":"python","args":["-m","mcp_servers.wms_server"],"transport":"stdio"}}
 ```
 
 之后问"批号 QS-2024-9527 在哪个库区"，agent 会自动调 `get_batch_storage` 而不是检索知识库。
+
+三个工具：`get_batch_storage`（读）、`list_batches`（读）、`release_batch`（写，执行前需人工审批）。假数据落在 `data/wms_mock.json`，stdio 每次新起会话也能读到上一次放行结果；删掉该文件即恢复初始数据。
 
 ## 三种"工具"不是一回事
 
@@ -63,7 +65,7 @@ stdio 与 http 的差别只在"怎么连"：
 
 反过来说：**同一系统的同一批数据、零重依赖、同一权限**就该合 —— 拆开只白增配置、握手次数和进程数。
 
-本项目的 `wms_server.py` 两个工具（`get_batch_storage` / `list_batches`）四条全指向"合"（同一批假数据、都只读、同属"仓库"），所以一个 server 装两个工具是**边界本来如此**，不是硬塞。惯例是 **一个 server ≈ 一个外部系统**。
+本项目的 `wms_server.py` 三个工具（`get_batch_storage` / `list_batches` / `release_batch`）指向同一个仓储系统、同一批假数据；写操作的审批与幂等在 agent 侧做，不在 server 内部，所以仍按**一个 server ≈ 一个外部系统**组织，不是按工具个数拆。
 
 > 依赖越重，越不能忍"每次调用起一次"：重依赖的 server 要么显式持长会话、要么常驻 http，别让它跟着调用反复冷启动。
 

@@ -9,7 +9,7 @@
 | 概念 | 解决什么 | 例子 |
 |---|---|---|
 | Prompt | 告诉模型“怎么答” | 问答/裁判/计划提示词 |
-| Tool | 一个可调用的函数或接口 | `search_knowledge_base`、`get_batch_storage` |
+| Tool | 一个可调用的函数或接口 | `search_knowledge_base`、`get_batch_storage`、`release_batch` |
 | **Skill** | **封装完整工作流：触发条件 + 步骤 + 工具 + 输出契约 + 失败处理** | 本目录两个 Skill |
 
 ## 两个 Skill
@@ -17,7 +17,7 @@
 | Skill | 触发 | 依赖 | 输出 | 失败处理 | 证据 |
 |---|---|---|---|---|---|
 | `enterprise-kb-qa` | 制度/SOP/条款等文档问题 | RAG 检索 + 生成 | 带 `[n]` 引用的答案 + sources；拒答不带引用 | 无命中如实拒答；服务失败不伪造 | 61 题检索、12+8 生成评测 |
-| `warehouse-batch-status` | 批号/库区/放行/结存等实时状态 | MCP 外部工具 + 人工审批 | 库区/温控/状态/结存 | 审批拒绝/超时不执行；工具超时报告失败 | 路由 14/14、计划 5/5 |
+| `warehouse-batch-status` | 批号/库区/批记录/偏差/放行 | MCP 外部工具（查询 + 放行）+ 人工审批 | 库区/储存条件/QA 状态/批记录/偏差/结存 | 审批拒绝/超时不执行；放行条件不满足逐条说明 | 路由 14/14、计划 5/5 |
 
 ## 执行链路
 
@@ -37,12 +37,12 @@
 - 生成：12 正 + 8 负，正确率 91.7%、引用正确率 100%、8/8 干净拒答
 - 路由：14 题 14/14（规则分类，零 LLM 花费）
 - 计划执行：5 个多步任务 5/5，平均 1.8 步 / 2877 token / 16.1s
-- 工程：114 个测试、故障注入、跨租户对抗
+- 工程：121 个测试、故障注入、跨租户对抗
 
 ## 代码位置
 
 - Skill 本体：`.claude/skills/enterprise-kb-qa/SKILL.md`、`.claude/skills/warehouse-batch-status/SKILL.md`
-- 演示脚本：各自 `scripts/` 目录
+- 演示脚本：各自 `scripts/` 目录（写操作只在 Skill 说明里走 `/agent/approve`，不提供绕过审批的脚本）
 - 路由/审批/台账：`app/agent/router.py`、`app/agent/approval.py`、`app/agent/execution_ledger.py`
 - 评测：`app/rag/*_eval.py`
 

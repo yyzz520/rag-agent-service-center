@@ -19,6 +19,7 @@ description: 当用户询问某个批号的实时仓储状态（库区、温控�
 
 - `batch_no`：批号（单批次查询）
 - 或“在库批次列表”类问题（调用 `list_batches`）
+- 或“放行某批成品”（调用 `release_batch`，写操作，必须走人工审批）
 
 ## 执行步骤
 
@@ -39,9 +40,13 @@ description: 当用户询问某个批号的实时仓储状态（库区、温控�
 ```json
 {
   "batch_no": "QS-2024-9527",
+  "material_type": "成品",
   "zone": "冷藏库 B-03",
-  "temperature": "2~8℃",
-  "status": "已放行",
+  "storage_condition": "2~8℃",
+  "qa_status": "已放行",
+  "batch_record_ok": true,
+  "deviation_open": false,
+  "expiry": "2027-06-30",
   "quantity": 1200
 }
 ```
@@ -58,11 +63,15 @@ description: 当用户询问某个批号的实时仓储状态（库区、温控�
 - 审批超时：默认按拒绝处理（fail-closed），并写审计
 - MCP 超时/不可用：报告工具失败，不伪造空结果
 - 参数校验失败：把错误反馈给用户，必要时用 `edit` 修正后重试
+- 放行被拒：批记录不完整 / 存在未关闭偏差 / 状态不是待放行 —— 逐条说明原因，不放行
 
 ## 示例
 
 问题：查一下批号 QS-2024-9527 现在在哪个库区、是否放行？
-流程：`awaiting_approval` → approve → 工具返回“冷藏库 B-03 / 已放行 / 1200 件” → 组织答案。
+流程：`awaiting_approval` → approve → 工具返回“冷藏库 B-03 / 2~8℃ / 已放行 / 批记录完整 / 无未关闭偏差 / 1200 件” → 组织答案。
+
+问题：把 QS-2024-6001 放行。
+流程：`release_batch` 需审批 → approve → 状态变为已放行（写结果落 `data/wms_mock.json`）；再次放行会提示“已是已放行，未重复执行”。
 
 ## 评测依据
 
@@ -72,4 +81,4 @@ description: 当用户询问某个批号的实时仓储状态（库区、温控�
 
 ## 相关实现
 
-`app/agent/router.py`、`app/agent/approval.py`、`app/agent/execution_ledger.py`、`mcp_servers/wms_server.py`
+`app/agent/router.py`、`app/agent/approval.py`、`app/agent/execution_ledger.py`、`mcp_servers/wms_server.py`（假数据 `data/wms_mock.json`，删除即重置）
