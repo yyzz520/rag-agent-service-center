@@ -123,6 +123,7 @@ make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
 - `.claude/skills/enterprise-kb-qa/`：企业知识库问答，含引用/拒答契约与失败处理
 - `.claude/skills/warehouse-batch-status/`：仓储批号状态查询，走 MCP 外部工具 + 人工审批
 - Skill 与 Prompt/Tool 的区别、调用链、输出契约和评测依据见 [Skill 案例](docs/skill-case.md)
+- 完整业务案例（制药企业 GMP 物料/成品仓：批记录、偏差、放行审批）见 [质量合规助手案例](docs/case-study.md)
 
 ## 评测（怎么证明有效）
 
@@ -159,6 +160,7 @@ make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
 - [设计与取舍（分布式组件、已知边界）](docs/design.md)
 - [评测说明（三层评测、指标口径、已知边界）](docs/evaluation.md)
 - [Agent Harness 层（能力矩阵、扩展点、生产级判断标准）](docs/harness.md)
+- [业务案例：制药企业 GMP 物料/成品仓质量合规助手](docs/case-study.md)
 - [架构决策记录（RRF / 存储 / 多副本）](docs/adr/)
 - [变更记录](CHANGELOG.md) · [贡献指南](CONTRIBUTING.md)
 
