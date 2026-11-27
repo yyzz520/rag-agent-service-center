@@ -116,44 +116,201 @@ function renderSources(wrap, sources) {
   wrap.appendChild(box);
 }
 
-// ---- 知识库问答 ----
+// ---- 流式工具 ----
+async function streamSSE(path, body, onEvent) {
+  const headers = { "Content-Type": "application/json" };
+  if (state.token) headers.Authorization = "Bearer " + state.token;
+  const start = performance.now();
+  const resp = await fetch(API + path, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok || !resp.body) {
+    let message = "HTTP " + resp.status;
+    try {
+      const d = await resp.json();
+      if (d.message) message = d.message;
+    } catch (e) { /* ignore */ }
+    throw new Error(message);
+  }
+  const trace = resp.headers.get("X-Trace-Id");
+  if (trace) {
+    $("traceId").textContent = "trace: " + trace;
+    $("runTrace").textContent = trace;
+  }
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx;
+    while ((idx = buffer.indexOf("\n\n")) >= 0) {
+      const block = buffer.slice(0, idx);
+      buffer = buffer.slice(idx + 2);
+      let event = "message";
+      let data = "";
+      block.split("\n").forEach((line) => {
+        line = line.replace(/\r$/, "");
+        if (line.startsWith("event: ")) event = line.slice(7).trim();
+        else if (line.startsWith("data: ")) data += line.slice(6);
+      });
+      if (data) {
+        let parsed = data;
+        try { parsed = JSON.parse(data); } catch (e) { /* keep string */ }
+        onEvent(event, parsed);
+      }
+    }
+  }
+  state.lastMs = Math.round(performance.now() - start);
+  $("runMs").textContent = state.lastMs + " ms";
+}
+
+function addStreamingMsg(container, text) {
+  const wrap = addMsg(container, "assistant", text);
+  const bubble = wrap.querySelector(".bubble");
+  bubble.classList.add("streaming");
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  wrap.appendChild(meta);
+  return { wrap, bubble, meta };
+}
+
+function addPill(meta, text, cls) {
+  const pill = document.createElement("span");
+  pill.className = "pill" + (cls ? " " + cls : "");
+  pill.textContent = text;
+  meta.appendChild(pill);
+}
+
+function scrollBottom(container) {
+  container.scrollTop = container.scrollHeight;
+}
+
+// ---- 知识库问答（流式）----
 async function sendRag(q) {
   const box = $("ragMessages");
   addMsg(box, "user", q);
   setPhase(0);
   updateRun({ route: "rag", tools: [], status: "检索中" });
-  const loading = addMsg(box, "assistant", "检索中…");
+  const { wrap, bubble } = addStreamingMsg(box, "连接中…");
+  let text = "";
+  let done = false;
+  let failure = null;
   try {
-    const d = await api("/rag/chat", { question: q });
-    loading.remove();
-    const wrap = addMsg(box, "assistant", d.answer || "(空)");
-    if (d.sources && d.sources.length) renderSources(wrap, d.sources);
+    await streamSSE("/rag/chat/stream", { question: q }, (event, d) => {
+      if (event === "content") {
+        if (!text) bubble.textContent = "";
+        text += d.delta || "";
+        bubble.textContent = text;
+        scrollBottom(box);
+      } else if (event === "done") {
+        done = true;
+        text = d.answer || text;
+        bubble.textContent = text || "(空)";
+        if (d.sources && d.sources.length) renderSources(wrap, d.sources);
+        setDebug(d);
+      } else if (event === "error") {
+        failure = d.message || "流式调用失败";
+      } else if (event === "meta") {
+        setDebug(d);
+      }
+    });
+    if (failure) throw new Error(failure);
+    bubble.classList.remove("streaming");
+    if (!done) bubble.textContent = text || "(空)";
     setPhase(3);
     updateRun({ route: "rag", tools: [], status: "完成" });
-    setDebug(d);
   } catch (e) {
-    loading.remove();
-    addMsg(box, "error", e.message);
+    bubble.classList.remove("streaming");
+    wrap.className = "msg error";
+    bubble.textContent = "请求失败：" + e.message;
+    setDebug({ error: e.message });
   }
 }
 
-// ---- 智能体 + 审批 ----
+// ---- 智能体 + 审批（流式）----
 async function sendAgent(q) {
   const box = $("agentMessages");
   addMsg(box, "user", q);
   setPhase(0);
   updateRun({ route: "—", tools: [], status: "思考中" });
-  const loading = addMsg(box, "assistant", "思考中…");
+  const { wrap, bubble, meta } = addStreamingMsg(box, "连接中…");
+  let text = "";
+  let route = "—";
+  let tools = [];
+  let routePill = false;
+  let done = false;
+  let awaiting = null;
+  let failure = null;
   try {
     const body = { question: q };
     if (state.agentConv) body.conversation_id = state.agentConv;
-    const d = await api("/agent/chat", body);
-    loading.remove();
-    if (d.conversation_id) state.agentConv = d.conversation_id;
-    handleAgent(d);
+    await streamSSE("/agent/chat/stream", body, (event, d) => {
+      if (event === "meta") {
+        if (d.conversation_id) state.agentConv = d.conversation_id;
+        if (d.route && !routePill) {
+          route = d.route;
+          routePill = true;
+          addPill(meta, "路由 " + route, "route-" + route);
+        }
+        updateRun({ route });
+        setDebug(d);
+      } else if (event === "content") {
+        if (!text) bubble.textContent = "";
+        text += d.delta || "";
+        bubble.textContent = text;
+        scrollBottom(box);
+      } else if (event === "tool_start") {
+        const name = d.name || "tool";
+        if (!tools.includes(name)) {
+          tools.push(name);
+          addPill(meta, "工具 " + name);
+        }
+        updateRun({ route, tools, status: "执行工具" });
+        setDebug(d);
+      } else if (event === "tool_end") {
+        updateRun({ route, tools, status: "执行工具" });
+        setDebug(d);
+      } else if (event === "awaiting_approval") {
+        awaiting = d;
+      } else if (event === "done") {
+        done = true;
+        text = d.answer || text;
+        if (d.route) route = d.route;
+        if (d.tools && d.tools.length) tools = d.tools;
+        bubble.textContent = text || "(空)";
+        setPhase(3);
+        updateRun({ route: d.route || route, tools, status: "完成" });
+        setDebug(d);
+      } else if (event === "error") {
+        failure = d.message || "流式调用失败";
+      }
+    });
+    if (failure) throw new Error(failure);
+    bubble.classList.remove("streaming");
+    if (awaiting) {
+      if (!text) wrap.remove();
+      if (awaiting.conversation_id) state.agentConv = awaiting.conversation_id;
+      setPhase(2);
+      updateRun({
+        route: awaiting.route || route,
+        tools: (awaiting.pending || []).map((p) => p.name),
+        status: "等待审批",
+      });
+      renderApproval(awaiting);
+      return;
+    }
+    if (!done) bubble.textContent = text || "(空)";
+    setPhase(3);
+    updateRun({ route, tools, status: "完成" });
   } catch (e) {
-    loading.remove();
-    addMsg(box, "error", e.message);
+    bubble.classList.remove("streaming");
+    wrap.className = "msg error";
+    bubble.textContent = "请求失败：" + e.message;
+    setDebug({ error: e.message });
   }
 }
 

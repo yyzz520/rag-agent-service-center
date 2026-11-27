@@ -454,3 +454,11 @@ code { background: #eef2ff; padding: 1px 5px; border-radius: 4px; }
   .sub { margin-left: 0; }
   .statusbar { padding: 8px 16px; }
 }
+
+.bubble.streaming::after {
+  content: "▍";
+  margin-left: 2px;
+  color: var(--brand);
+  animation: blink 1s steps(2, start) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
