@@ -3,25 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RAG + Agent 演示台</title>
-  <link rel="stylesheet" href="/static/demo.css">
+  <title>质量合规工作台</title>
+  <link rel="stylesheet" href="/static/workspace.css">
 </head>
 <body>
   <header class="top">
     <div>
-      <h1>RAG + Agent 演示台</h1>
-      <p class="sub">制药企业 GMP 物料/成品仓场景 · 合成数据</p>
+      <h1>质量合规工作台</h1>
+      <p class="sub">制药企业 GMP 物料/成品仓 · 合成数据环境</p>
     </div>
     <div class="auth">
-      <input id="username" value="alice" autocomplete="username" aria-label="用户名">
-      <input id="password" type="password" value="alice123" autocomplete="current-password" aria-label="密码">
+      <input id="username" value="admin" autocomplete="username" aria-label="用户名">
+      <input id="password" type="password" value="admin123" autocomplete="current-password" aria-label="密码">
       <button id="loginBtn">登录</button>
       <span id="userInfo" class="muted"></span>
     </div>
   </header>
 
   <div class="statusbar">
-    <span class="pill">后端能力演示台 · 非产品前端</span>
+    <span class="pill">质量合规工作台</span>
     <span class="pill">合成数据</span>
     <span class="pill">路由评测 14/14</span>
     <span class="pill">计划执行 5/5</span>
@@ -29,59 +29,98 @@
     <span class="pill" id="traceId">trace: —</span>
   </div>
 
-  <nav class="tabs">
-    <button class="tab-btn active" data-tab="rag">知识库问答</button>
-    <button class="tab-btn" data-tab="agent">智能体与审批</button>
-    <button class="tab-btn" data-tab="plan">计划任务</button>
-  </nav>
+  <div class="layout">
+    <aside class="side">
+      <h2>本次运行</h2>
+      <div class="kv"><span>用户</span><b id="runUser">—</b></div>
+      <div class="kv"><span>路由</span><b id="runRoute">—</b></div>
+      <div class="kv"><span>工具</span><b id="runTools">—</b></div>
+      <div class="kv"><span>状态</span><b id="runStatus">—</b></div>
+      <div class="kv"><span>trace</span><b id="runTrace" class="mono">—</b></div>
+      <div class="kv"><span>耗时</span><b id="runMs">—</b></div>
 
-  <main>
-    <section id="tab-rag" class="tab active">
-      <div class="chips">
-        <button data-q="冷藏库的温控要求是什么？">冷藏库温控要求</button>
-        <button data-q="偏差按影响程度分成哪几级？">偏差分级</button>
-        <button data-q="清源缓释片治疗糖尿病的最佳剂量是多少？">负样本（应拒答）</button>
-      </div>
-      <div id="ragMessages" class="messages"></div>
-      <form id="ragForm" class="composer">
-        <input id="ragInput" placeholder="问文档 / 制度 / SOP…" autocomplete="off">
-        <button type="submit">发送</button>
-      </form>
-    </section>
+      <h2>流程</h2>
+      <ol class="flow" id="flow">
+        <li data-phase="0">路由</li>
+        <li data-phase="1">工具</li>
+        <li data-phase="2">人工审批</li>
+        <li data-phase="3">答案</li>
+      </ol>
 
-    <section id="tab-agent" class="tab">
-      <div class="chips">
-        <button data-q="批号 QS-2024-9527 的库区、批记录和放行状态">查批号状态</button>
-        <button data-q="请把批号 QS-2024-6001 放行">放行（需审批）</button>
-        <button data-q="请把批号 QS-2024-6100 放行">放行有偏差批次</button>
-      </div>
-      <div class="row">
-        <button id="newAgent" class="ghost">新会话</button>
-        <span class="muted">外部工具执行前会暂停，等待批准 / 拒绝</span>
-      </div>
-      <div id="agentMessages" class="messages"></div>
-      <form id="agentForm" class="composer">
-        <input id="agentInput" placeholder="问实时状态 / 发起写操作…" autocomplete="off">
-        <button type="submit">发送</button>
-      </form>
-    </section>
+      <h2>评测快照</h2>
+      <div class="mini-row"><span>路由</span><b>14/14</b></div>
+      <div class="mini-row"><span>计划执行</span><b>5/5</b></div>
+      <div class="mini-row"><span>pytest</span><b>123</b></div>
+      <p class="side-note">查看完整指标请切到「评测数据」页签（需管理员）。</p>
+    </aside>
 
-    <section id="tab-plan" class="tab">
-      <div class="chips">
-        <button data-q="查一下批号 QS-2024-9527 的库区和放行状态，再查知识库里冷藏库的温控要求，判断存放是否合规">多步合规核对</button>
-        <button data-q="对比批号 QS-2024-9527 和 QS-2024-8831 分别在哪个库区、是否放行">两批号对比</button>
-      </div>
-      <div class="row">
-        <button id="newPlan" class="ghost">新计划</button>
-        <span class="muted">先生成计划，人工批准后逐步执行</span>
-      </div>
-      <div id="planMessages" class="messages"></div>
-      <form id="planForm" class="composer">
-        <input id="planInput" placeholder="描述一个多步任务…" autocomplete="off">
-        <button type="submit">生成计划</button>
-      </form>
-    </section>
-  </main>
+    <div class="content">
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="rag">知识库问答</button>
+        <button class="tab-btn" data-tab="agent">智能体与审批</button>
+        <button class="tab-btn" data-tab="plan">计划任务</button>
+        <button class="tab-btn" data-tab="eval">评测数据</button>
+      </nav>
+
+      <main>
+        <section id="tab-rag" class="tab active">
+          <div class="chips">
+            <button data-q="冷藏库的温控要求是什么？">冷藏库温控要求</button>
+            <button data-q="偏差按影响程度分成哪几级？">偏差分级</button>
+            <button data-q="清源缓释片治疗糖尿病的最佳剂量是多少？">负样本（应拒答）</button>
+          </div>
+          <div id="ragMessages" class="messages"></div>
+          <form id="ragForm" class="composer">
+            <input id="ragInput" placeholder="问文档 / 制度 / SOP…" autocomplete="off">
+            <button type="submit">发送</button>
+          </form>
+        </section>
+
+        <section id="tab-agent" class="tab">
+          <div class="chips">
+            <button data-q="批号 QS-2024-9527 的库区、批记录和放行状态">查批号状态</button>
+            <button data-q="请把批号 QS-2024-6001 放行">放行（需审批）</button>
+            <button data-q="请把批号 QS-2024-6100 放行">放行有偏差批次</button>
+          </div>
+          <div class="row">
+            <button id="newAgent" class="ghost">新会话</button>
+            <span class="muted">外部工具执行前会暂停，等待批准 / 拒绝</span>
+          </div>
+          <div id="agentMessages" class="messages"></div>
+          <form id="agentForm" class="composer">
+            <input id="agentInput" placeholder="问实时状态 / 发起写操作…" autocomplete="off">
+            <button type="submit">发送</button>
+          </form>
+        </section>
+
+        <section id="tab-plan" class="tab">
+          <div class="chips">
+            <button data-q="查一下批号 QS-2024-9527 的库区和放行状态，再查知识库里冷藏库的温控要求，判断存放是否合规">多步合规核对</button>
+            <button data-q="对比批号 QS-2024-9527 和 QS-2024-8831 分别在哪个库区、是否放行">两批号对比</button>
+          </div>
+          <div class="row">
+            <button id="newPlan" class="ghost">新计划</button>
+            <span class="muted">先生成计划，人工批准后逐步执行</span>
+          </div>
+          <div id="planMessages" class="messages"></div>
+          <form id="planForm" class="composer">
+            <input id="planInput" placeholder="描述一个多步任务…" autocomplete="off">
+            <button type="submit">生成计划</button>
+          </form>
+        </section>
+
+        <section id="tab-eval" class="tab">
+          <div class="row">
+            <button id="loadEval" class="ghost">刷新评测数据</button>
+            <span class="muted">读取最近一次评测报告（需管理员权限）</span>
+          </div>
+          <div id="evalCards" class="cards">
+            <p class="muted">切换到本页签时自动加载。</p>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
 
   <details class="debug">
     <summary>原始响应（调试用）</summary>
@@ -89,9 +128,9 @@
   </details>
 
   <footer class="muted">
-    演示环境 · 全部为合成数据 · 重置仓储状态：删除 <code>data/wms_mock.json</code> 后重新查询
+    合成数据环境 · 重置仓储状态：<code>make workspace-reset</code>
   </footer>
 
-  <script src="/static/demo.js"></script>
+  <script src="/static/workspace.js"></script>
 </body>
 </html>

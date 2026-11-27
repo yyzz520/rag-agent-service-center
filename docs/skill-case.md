@@ -42,11 +42,11 @@
 ## 代码位置
 
 - Skill 本体：`.claude/skills/enterprise-kb-qa/SKILL.md`、`.claude/skills/warehouse-batch-status/SKILL.md`
-- 演示脚本：各自 `scripts/` 目录（写操作只在 Skill 说明里走 `/agent/approve`，不提供绕过审批的脚本）
+- 示例脚本：各自 `scripts/` 目录（写操作只在 Skill 说明里走 `/agent/approve`，不提供绕过审批的脚本）
 - 路由/审批/台账：`app/agent/router.py`、`app/agent/approval.py`、`app/agent/execution_ledger.py`
 - 评测：`app/rag/*_eval.py`
 
 ## 边界（如实说明）
 
-- 演示语料是项目自带的**虚构医药/仓储数据**，不涉及任何真实客户材料
+- 合成语料是项目自带的**虚构医药/仓储数据**，不涉及任何真实客户材料
 - 如果贵司的 Skill 指平台化的技能配置（可视化编排），核心方法一致：触发条件、工具编排、输出契约、失败兜底，可按你们规范适配

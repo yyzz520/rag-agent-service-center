@@ -1,5 +1,5 @@
 const API = "/api/v1";
-const state = { token: "", agentConv: null, planConv: null };
+const state = { token: "", agentConv: null, planConv: null, lastMs: 0 };
 
 const $ = (id) => document.getElementById(id);
 
@@ -7,16 +7,38 @@ function setDebug(obj) {
   $("debug").textContent = JSON.stringify(obj, null, 2);
 }
 
-async function api(path, body) {
+function updateRun(patch) {
+  if (patch.user !== undefined) $("runUser").textContent = patch.user;
+  if (patch.route !== undefined) $("runRoute").textContent = patch.route || "—";
+  if (patch.tools !== undefined) {
+    $("runTools").textContent = patch.tools && patch.tools.length
+      ? patch.tools.join(" / ") : "—";
+  }
+  if (patch.status !== undefined) $("runStatus").textContent = patch.status || "—";
+}
+
+function setPhase(n) {
+  document.querySelectorAll("#flow li").forEach((li) => {
+    li.classList.toggle("active", Number(li.dataset.phase) <= n);
+  });
+}
+
+async function api(path, body, method) {
   const headers = { "Content-Type": "application/json" };
   if (state.token) headers.Authorization = "Bearer " + state.token;
+  const start = performance.now();
   const resp = await fetch(API + path, {
-    method: "POST",
+    method: method || "POST",
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+  state.lastMs = Math.round(performance.now() - start);
+  $("runMs").textContent = state.lastMs + " ms";
   const trace = resp.headers.get("X-Trace-Id");
-  if (trace) $("traceId").textContent = "trace: " + trace;
+  if (trace) {
+    $("traceId").textContent = "trace: " + trace;
+    $("runTrace").textContent = trace;
+  }
   let data = null;
   try {
     data = await resp.json();
@@ -29,14 +51,21 @@ async function api(path, body) {
   return data.data;
 }
 
+function apiGet(path) {
+  return api(path, undefined, "GET");
+}
+
 async function login() {
   const username = $("username").value.trim();
   const password = $("password").value;
   const data = await api("/auth/login", { username, password });
   state.token = data.token;
   $("userInfo").textContent =
-    "已登录 " + data.user.username + " · " + data.user.tenant_id +
-    " · " + (data.user.org_id || "无组织") + " L" + (data.user.level || 1);
+    "已登录 " + data.user.username + " · " + data.user.tenant_id;
+  updateRun({
+    user: data.user.username + " · " + data.user.tenant_id +
+      " · " + (data.user.org_id || "无组织") + " L" + (data.user.level || 1),
+  });
 }
 
 function addMsg(container, role, text, meta) {
@@ -90,12 +119,16 @@ function renderSources(wrap, sources) {
 async function sendRag(q) {
   const box = $("ragMessages");
   addMsg(box, "user", q);
+  setPhase(0);
+  updateRun({ route: "rag", tools: [], status: "检索中" });
   const loading = addMsg(box, "assistant", "检索中…");
   try {
     const d = await api("/rag/chat", { question: q });
     loading.remove();
     const wrap = addMsg(box, "assistant", d.answer || "(空)");
     if (d.sources && d.sources.length) renderSources(wrap, d.sources);
+    setPhase(3);
+    updateRun({ route: "rag", tools: [], status: "完成" });
     setDebug(d);
   } catch (e) {
     loading.remove();
@@ -107,6 +140,8 @@ async function sendRag(q) {
 async function sendAgent(q) {
   const box = $("agentMessages");
   addMsg(box, "user", q);
+  setPhase(0);
+  updateRun({ route: "—", tools: [], status: "思考中" });
   const loading = addMsg(box, "assistant", "思考中…");
   try {
     const body = { question: q };
@@ -124,9 +159,13 @@ async function sendAgent(q) {
 function handleAgent(d) {
   setDebug(d);
   if (d.status === "awaiting_approval") {
+    setPhase(2);
+    updateRun({ route: d.route || "tool", tools: d.tools || [], status: "等待审批" });
     renderApproval(d);
     return;
   }
+  setPhase(3);
+  updateRun({ route: d.route || "tool", tools: d.tools || [], status: "完成" });
   const meta = [];
   if (d.route) meta.push({ text: "路由 " + d.route, cls: "route-" + d.route });
   if (d.tools && d.tools.length) meta.push({ text: "工具 " + d.tools.join(" / ") });
@@ -192,6 +231,8 @@ async function decideAgent(d, type, buttons) {
 async function sendPlan(q) {
   const box = $("planMessages");
   addMsg(box, "user", q);
+  setPhase(0);
+  updateRun({ route: "plan", tools: [], status: "规划中" });
   const loading = addMsg(box, "assistant", "生成计划…");
   try {
     const body = { question: q };
@@ -208,10 +249,16 @@ async function sendPlan(q) {
 
 function handlePlan(d) {
   setDebug(d);
+  const steps = d.plan || d.steps || [];
+  const tools = steps.map((s) => s.tool).filter(Boolean);
   if (d.status === "awaiting_plan_approval") {
+    setPhase(2);
+    updateRun({ route: "plan", tools, status: "计划待审批" });
     renderPlan(d);
     return;
   }
+  setPhase(3);
+  updateRun({ route: "plan", tools, status: "完成" });
   const box = $("planMessages");
   const wrap = addMsg(box, "assistant", d.answer || "(空)");
   if (d.steps && d.steps.length) renderSteps(wrap, d.steps);
@@ -299,6 +346,78 @@ function renderSteps(wrap, steps) {
   wrap.appendChild(box);
 }
 
+// ---- 评测数据 ----
+async function loadEval() {
+  const box = $("evalCards");
+  box.textContent = "加载中…";
+  try {
+    const [ret, gen, agent, router, plan] = await Promise.all([
+      apiGet("/eval/retrieval"),
+      apiGet("/eval/generation"),
+      apiGet("/eval/agent"),
+      apiGet("/eval/router"),
+      apiGet("/eval/plan"),
+    ]);
+    const cards = [
+      metricCard("检索（最近）", ret.latest && ret.latest.metrics, [
+        ["recall@1", "recall@1"], ["recall@5", "recall@5"],
+        ["MRR", "mrr"], ["NDCG@16", "ndcg@16"],
+      ]),
+      metricCard("生成（最近）", gen.latest && gen.latest.metrics, [
+        ["正确率", "correct_rate"], ["引用率", "citation_rate"],
+        ["拒答率", "refusal_rate"],
+      ]),
+      metricCard("Agent（最近）", agent.latest && agent.latest.metrics, [
+        ["工具路由", "tool_route_accuracy"], ["完成率", "completion_rate"],
+        ["平均步数", "avg_tool_steps"], ["平均 token", "avg_tokens"],
+      ]),
+      metricCard("路由（最近）", router.latest && router.latest.metrics, [
+        ["准确率", "accuracy"], ["题数", "total"],
+      ]),
+      metricCard("计划执行（最近）", plan.latest && plan.latest.metrics, [
+        ["成功率", "success_rate"], ["平均步数", "avg_steps"],
+        ["平均 token", "avg_tokens"], ["平均耗时 ms", "avg_ms"],
+      ]),
+    ];
+    box.innerHTML = "";
+    cards.forEach((c) => box.appendChild(c));
+    const hint = document.createElement("p");
+    hint.className = "muted";
+    hint.textContent = "数据来自最近一次评测报告；完整历史见 /eval/* 接口。";
+    box.appendChild(hint);
+  } catch (e) {
+    box.textContent = "加载失败：" + e.message + "（评测数据需要管理员账号）";
+  }
+}
+
+function metricCard(title, metrics, rows) {
+  const el = document.createElement("div");
+  el.className = "card";
+  const h = document.createElement("h3");
+  h.textContent = title;
+  el.appendChild(h);
+  if (!metrics) {
+    const p = document.createElement("div");
+    p.className = "hint";
+    p.textContent = "暂无数据（先跑一次评测）";
+    el.appendChild(p);
+    return el;
+  }
+  rows.forEach(([label, key]) => {
+    if (metrics[key] === undefined || metrics[key] === null) return;
+    const row = document.createElement("div");
+    row.className = "metric";
+    const span = document.createElement("span");
+    span.textContent = label;
+    const b = document.createElement("b");
+    b.textContent = String(metrics[key]);
+    row.appendChild(span);
+    row.appendChild(b);
+    el.appendChild(row);
+  });
+  return el;
+}
+
 // ---- 交互绑定 ----
 function wire() {
   document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -307,6 +426,7 @@ function wire() {
       document.querySelectorAll(".tab").forEach((s) => s.classList.remove("active"));
       btn.classList.add("active");
       $("tab-" + btn.dataset.tab).classList.add("active");
+      if (btn.dataset.tab === "eval") loadEval();
     };
   });
 
@@ -356,6 +476,7 @@ function wire() {
     state.planConv = null;
     $("planMessages").innerHTML = "";
   };
+  $("loadEval").onclick = () => loadEval();
 }
 
 window.addEventListener("DOMContentLoaded", () => {

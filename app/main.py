@@ -177,10 +177,10 @@ _STATIC_DIR = Path(__file__).resolve().parent / "static"
 app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
 
-@app.get("/demo", include_in_schema=False)
-def demo_page():
-    """单页演示台：知识库问答 / 智能体与审批 / 计划任务。"""
-    return FileResponse(_STATIC_DIR / "demo.html")
+@app.get("/workspace", include_in_schema=False)
+def workspace_page():
+    """单页工作台：知识库问答 / 智能体与审批 / 计划任务。"""
+    return FileResponse(_STATIC_DIR / "workspace.html")
 
 
 @app.get("/health", summary="健康检查")

@@ -32,7 +32,7 @@ description: 当用户询问某个批号的实时仓储状态（库区、温控�
 4. 工具返回后，按“库区 / 温控要求 / 放行状态 / 结存数量”组织答案
 5. 数据缺失时明确说缺什么，不猜测温度或库存
 
-> 只读演示可直连脚本：`python .claude/skills/warehouse-batch-status/scripts/query_batch.py QS-2024-9527`
+> 只读示例可直连脚本：`python .claude/skills/warehouse-batch-status/scripts/query_batch.py QS-2024-9527`
 > 线上必须走 `/agent/chat`，这样外部工具才会经过人工审批（HITL）与执行台账。
 
 ## 输出契约
@@ -77,7 +77,7 @@ description: 当用户询问某个批号的实时仓储状态（库区、温控�
 
 - 路由评测：14 题固定集 14/14
 - 计划执行评测：5 个多步任务 5/5，平均 1.8 步 / 2877 token / 16.1s
-- 演示数据为项目自带的虚构仓储数据，不涉及任何真实业务材料
+- 合成数据为项目自带的虚构仓储数据，不涉及任何真实业务材料
 
 ## 相关实现
 
