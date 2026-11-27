@@ -1,5 +1,5 @@
 const API = "/api/v1";
-const state = { token: "", agentConv: null, planConv: null, lastMs: 0 };
+const state = { token: "", agentConv: null, planConv: null, lastMs: 0, docId: null, docPage: null, docBlobUrl: null, chunkItems: [] };
 
 const $ = (id) => document.getElementById(id);
 
@@ -68,6 +68,14 @@ async function login() {
       " · " + data.user.tenant_id,
   });
   loadMiniEval().catch(() => {});
+  listDocs().catch(() => {});
+}
+
+function authHeaders(json) {
+  const headers = {};
+  if (state.token) headers.Authorization = "Bearer " + state.token;
+  if (json) headers["Content-Type"] = "application/json";
+  return headers;
 }
 
 function addMsg(container, role, text, meta) {
@@ -114,6 +122,14 @@ function renderSources(wrap, sources) {
     body.textContent = String(s.content || "").slice(0, 420);
     div.appendChild(head);
     div.appendChild(body);
+    if (s.doc_id) {
+      const btn = document.createElement("button");
+      btn.className = "ghost";
+      btn.textContent = "查看链路";
+      btn.style.marginTop = "6px";
+      btn.onclick = () => openTrace(s);
+      div.appendChild(btn);
+    }
     box.appendChild(div);
   });
   wrap.appendChild(box);
@@ -198,6 +214,7 @@ function hideOverview() {
 }
 
 function switchTab(name) {
+  hideOverview();
   document.querySelectorAll(".tab-btn").forEach((b) => {
     b.classList.toggle("active", b.dataset.tab === name);
   });
@@ -642,6 +659,275 @@ function metricCard(title, metrics, rows) {
   return el;
 }
 
+
+// ---- 文档入库 / 溯源 ----
+async function listDocs() {
+  const box = $("docList");
+  box.textContent = "加载中…";
+  try {
+    const d = await apiGet("/docs");
+    renderDocList(d.items || []);
+  } catch (e) {
+    box.textContent = "加载失败：" + e.message;
+  }
+}
+
+function renderDocList(items) {
+  const box = $("docList");
+  box.innerHTML = "";
+  if (!items.length) {
+    const p = document.createElement("p");
+    p.className = "muted";
+    p.textContent = "还没有文档，先上传一份（samples/medical 里有 md/docx/xlsx/pdf 示例）。";
+    box.appendChild(p);
+    return;
+  }
+  items.forEach((doc) => {
+    const btn = document.createElement("button");
+    btn.className = "doc-item";
+    btn.dataset.id = doc.doc_id;
+    if (state.docId === doc.doc_id) btn.classList.add("active");
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = doc.file_name;
+    const meta = document.createElement("span");
+    meta.className = "meta";
+    meta.textContent = doc.status + " · " + doc.chunk_count + " 块";
+    btn.appendChild(name);
+    btn.appendChild(meta);
+    btn.onclick = () => inspectDoc(doc.doc_id);
+    box.appendChild(btn);
+  });
+}
+
+function setUploadStatus(text, cls) {
+  const el = $("uploadStatus");
+  el.textContent = text;
+  el.className = "muted" + (cls ? " " + cls : "");
+}
+
+async function uploadDoc() {
+  const file = $("fileInput").files[0];
+  if (!file) {
+    setUploadStatus("请先选择文件", "err");
+    return;
+  }
+  $("uploadBtn").disabled = true;
+  setUploadStatus("上传中…");
+  try {
+    const fd = new FormData();
+    fd.append("file", file);
+    const resp = await fetch(API + "/docs", {
+      method: "POST",
+      headers: authHeaders(false),
+      body: fd,
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || data.code !== 0) throw new Error(data.message || "上传失败");
+    setUploadStatus("已上传，解析中：" + data.data.doc_id);
+    await pollDoc(data.data.doc_id);
+  } catch (e) {
+    setUploadStatus("上传失败：" + e.message, "err");
+  } finally {
+    $("uploadBtn").disabled = false;
+  }
+}
+
+async function pollDoc(id) {
+  for (let i = 0; i < 120; i++) {
+    let d;
+    try {
+      d = await apiGet("/docs/" + id);
+    } catch (e) {
+      setUploadStatus("查询状态失败：" + e.message, "err");
+      return;
+    }
+    setUploadStatus(
+      "解析状态：" + d.status + " · " + d.chunk_count + " 块" +
+      (d.error_msg ? " · " + d.error_msg : ""),
+      d.status === "failed" ? "err" : d.status === "ready" ? "ok" : ""
+    );
+    if (d.status === "ready" || d.status === "failed") {
+      await listDocs();
+      await inspectDoc(id);
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  setUploadStatus("解析超时，请稍后刷新列表", "err");
+}
+
+async function inspectDoc(id, opts) {
+  opts = opts || {};
+  state.docId = id;
+  state.docPage = opts.page || null;
+  $("inspector").classList.remove("hidden");
+  $("inspName").textContent = "加载中…";
+  $("inspMeta").textContent = "";
+  $("tracePath").textContent = opts.traceLabel || "";
+  $("sourcePane").textContent = "加载中…";
+  $("parsedPane").textContent = "加载中…";
+  $("chunkList").textContent = "加载中…";
+  $("chunkDetail").textContent = "";
+  document.querySelectorAll(".doc-item").forEach((el) => {
+    el.classList.toggle("active", el.dataset.id === id);
+  });
+  try {
+    const detail = await apiGet("/docs/" + id);
+    $("inspName").textContent = detail.file_name;
+    $("inspMeta").textContent =
+      detail.status + " · " + detail.chunk_count + " 块" +
+      (detail.kb_name ? " · " + detail.kb_name : "");
+    await Promise.all([
+      renderSourcePane(detail, opts.page),
+      loadParsed(id),
+      loadChunks(id, opts.vectorId),
+    ]);
+  } catch (e) {
+    $("inspName").textContent = "加载失败";
+    $("inspMeta").textContent = e.message;
+  }
+}
+
+async function renderSourcePane(doc, page) {
+  const pane = $("sourcePane");
+  pane.textContent = "加载中…";
+  try {
+    const resp = await fetch(API + "/docs/" + doc.doc_id + "/source", {
+      headers: authHeaders(false),
+    });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const blob = await resp.blob();
+    if (state.docBlobUrl) URL.revokeObjectURL(state.docBlobUrl);
+    state.docBlobUrl = URL.createObjectURL(blob);
+    const ext = (doc.file_name.split(".").pop() || "").toLowerCase();
+    pane.textContent = "";
+    pane.style.padding = "0";
+    if (ext === "pdf") {
+      const frame = document.createElement("iframe");
+      frame.className = "pdf-frame";
+      frame.src = state.docBlobUrl + (page ? "#page=" + page : "");
+      pane.appendChild(frame);
+    } else if (ext === "txt" || ext === "md") {
+      const pre = document.createElement("pre");
+      pre.className = "pane-body";
+      pre.style.height = "340px";
+      pre.textContent = await blob.text();
+      pane.appendChild(pre);
+    } else {
+      const box = document.createElement("div");
+      box.className = "source-fallback";
+      box.style.padding = "10px";
+      const p = document.createElement("p");
+      p.textContent = "浏览器无法直接预览 " + ext + "，可下载后查看。";
+      const a = document.createElement("a");
+      a.href = state.docBlobUrl;
+      a.download = doc.file_name;
+      a.textContent = "下载原文件";
+      box.appendChild(p);
+      box.appendChild(a);
+      pane.appendChild(box);
+    }
+  } catch (e) {
+    pane.textContent = "源文件加载失败：" + e.message;
+  }
+}
+
+async function loadParsed(id) {
+  const pre = $("parsedPane");
+  pre.textContent = "加载中…";
+  try {
+    const d = await apiGet("/docs/" + id + "/parsed");
+    pre.textContent = d.available ? d.text : (d.hint || "暂无解析文本");
+  } catch (e) {
+    pre.textContent = "解析文本加载失败：" + e.message;
+  }
+}
+
+async function loadChunks(id, selected) {
+  const box = $("chunkList");
+  box.textContent = "加载中…";
+  try {
+    const d = await apiGet("/docs/" + id + "/chunks");
+    state.chunkItems = d.items || [];
+    box.innerHTML = "";
+    if (!state.chunkItems.length) {
+      box.textContent = "暂无切块";
+      return;
+    }
+    state.chunkItems.forEach((item) => {
+      const btn = document.createElement("button");
+      btn.className = "chunk-item";
+      btn.dataset.id = item.id;
+      const row = document.createElement("div");
+      row.className = "row1";
+      const level = document.createElement("span");
+      level.className = "level " + (item.metadata.chunk_level || "");
+      level.textContent = item.metadata.chunk_level || "chunk";
+      const meta = document.createElement("span");
+      meta.textContent = "id " + item.id + (item.metadata.page ? " · p" + item.metadata.page : "");
+      row.appendChild(level);
+      row.appendChild(meta);
+      const snip = document.createElement("div");
+      snip.className = "snippet";
+      snip.textContent = (item.content || "").slice(0, 80);
+      btn.appendChild(row);
+      btn.appendChild(snip);
+      btn.onclick = () => selectChunk(item.id);
+      box.appendChild(btn);
+    });
+    if (selected) selectChunk(selected);
+    else if (state.chunkItems[0]) selectChunk(state.chunkItems[0].id);
+  } catch (e) {
+    box.textContent = "切块加载失败：" + e.message;
+  }
+}
+
+function selectChunk(id) {
+  const item = state.chunkItems.find((x) => x.id === id) ||
+    state.chunkItems.find((x) => x.metadata.parent_id === id);
+  document.querySelectorAll(".chunk-item").forEach((el) => {
+    el.classList.toggle("selected", item && el.dataset.id === item.id);
+  });
+  const detail = $("chunkDetail");
+  if (!item) {
+    detail.textContent = "未找到该块";
+    return;
+  }
+  let text =
+    "chunk_id: " + item.id +
+    "\nlevel: " + item.metadata.chunk_level +
+    "\nparent_id: " + (item.metadata.parent_id || "-") +
+    "\npage: " + (item.metadata.page || "-") +
+    "\n\n" + item.content;
+  if (item.parent_content) text += "\n\n--- 父块 ---\n" + item.parent_content;
+  detail.textContent = text;
+  const el = document.querySelector('.chunk-item[data-id="' + item.id + '"]');
+  if (el) el.scrollIntoView({ block: "nearest" });
+}
+
+function openTrace(src) {
+  if (!src.doc_id) return;
+  const chunkId = src.vector_id || src.parent_id || "";
+  switchTab("ingest");
+  inspectDoc(src.doc_id, {
+    vectorId: chunkId,
+    page: src.page,
+    traceLabel: "答案 [" + src.id + "] → 块 " + chunkId + " → 解析文本 → 源文件",
+  });
+}
+
+async function openSourceFile() {
+  if (!state.docId) return;
+  if (!state.docBlobUrl) {
+    await renderSourcePane(
+      { doc_id: state.docId, file_name: $("inspName").textContent },
+      state.docPage
+    );
+  }
+  if (state.docBlobUrl) window.open(state.docBlobUrl, "_blank");
+}
+
 // ---- 交互绑定 ----
 function wire() {
   document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -706,6 +992,13 @@ function wire() {
     showEmpty($("planMessages"), "还没有计划", "描述一个多步任务，先生成计划，再批准执行。");
   };
   $("loadEval").onclick = () => loadEval();
+  $("uploadBtn").onclick = () => uploadDoc();
+  $("refreshDoc").onclick = () => state.docId && inspectDoc(state.docId);
+  $("openSource").onclick = () => openSourceFile();
+  $("fileInput").onchange = () => {
+    const f = $("fileInput").files[0];
+    setUploadStatus(f ? "已选择：" + f.name : "请选择文件");
+  };
 }
 
 window.addEventListener("DOMContentLoaded", () => {

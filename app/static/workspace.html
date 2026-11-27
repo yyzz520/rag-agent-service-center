@@ -82,14 +82,53 @@
       </section>
 
       <nav class="tabs">
-        <button class="tab-btn active" data-tab="rag">知识库问答</button>
+        <button class="tab-btn active" data-tab="ingest">文档入库</button>
+        <button class="tab-btn" data-tab="rag">知识库问答</button>
         <button class="tab-btn" data-tab="agent">智能体与审批</button>
         <button class="tab-btn" data-tab="plan">计划任务</button>
         <button class="tab-btn" data-tab="eval">评测数据</button>
       </nav>
 
       <main>
-        <section id="tab-rag" class="tab active">
+        <section id="tab-ingest" class="tab active">
+          <div class="ingest-grid">
+            <div class="panel">
+              <h3>上传文档</h3>
+              <input type="file" id="fileInput" accept=".txt,.md,.pdf,.docx,.xlsx">
+              <button id="uploadBtn">上传并解析</button>
+              <p id="uploadStatus" class="muted">支持 txt/md/pdf/docx/xlsx；扫描件走 OCR。</p>
+            </div>
+            <div class="panel">
+              <h3>文档列表</h3>
+              <div id="docList" class="doc-list"><p class="muted">加载中…</p></div>
+            </div>
+          </div>
+
+          <div id="inspector" class="inspector hidden">
+            <div class="inspector-head">
+              <div>
+                <strong id="inspName">—</strong>
+                <span id="inspMeta" class="muted"></span>
+              </div>
+              <div class="inspector-actions">
+                <span id="tracePath" class="trace-path"></span>
+                <button id="openSource" class="ghost">打开源文件</button>
+                <button id="refreshDoc" class="ghost">刷新</button>
+              </div>
+            </div>
+            <div class="inspector-grid">
+              <div class="pane"><h4>源文件</h4><div id="sourcePane" class="pane-body"></div></div>
+              <div class="pane"><h4>解析文本</h4><pre id="parsedPane" class="pane-body"></pre></div>
+              <div class="pane">
+                <h4>切块（父/子）</h4>
+                <div id="chunkList" class="pane-body chunk-list"></div>
+                <pre id="chunkDetail" class="chunk-detail"></pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="tab-rag" class="tab">
           <div class="chips">
             <button data-q="冷藏库的温控要求是什么？">冷藏库温控要求</button>
             <button data-q="偏差按影响程度分成哪几级？">偏差分级</button>
