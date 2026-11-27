@@ -1,7 +1,7 @@
 PYTHON ?= .venv/bin/python
 DAYS ?= 7
 
-.PHONY: venv install install-dev test lint verify eval-gate eval-router eval-plan export-finetune quality-report seed seed-eval reindex security run
+.PHONY: venv install install-dev test lint verify eval-gate eval-router eval-plan export-finetune quality-report seed seed-eval reindex security run demo-reset
 
 .venv:
 	python3 -m venv .venv
@@ -45,6 +45,9 @@ seed-eval:
 
 reindex:
 	$(PYTHON) scripts/reindex_demo.py
+
+demo-reset:
+	rm -f data/wms_mock.json
 
 security:
 	$(PYTHON) scripts/check_secrets.py

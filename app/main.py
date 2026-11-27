@@ -4,10 +4,12 @@ import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException, RequestValidationError
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.agent.graph import init_checkpointer
 from app.agent.mcp_tools import get_mcp_tools
@@ -170,6 +172,15 @@ app.include_router(agent.router, prefix="/api/v1")
 app.include_router(plan.router, prefix="/api/v1")
 app.include_router(eval_api.router, prefix="/api/v1")
 app.include_router(sessions.router, prefix="/api/v1")
+
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
+app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+
+
+@app.get("/demo", include_in_schema=False)
+def demo_page():
+    """单页演示台：知识库问答 / 智能体与审批 / 计划任务。"""
+    return FileResponse(_STATIC_DIR / "demo.html")
 
 
 @app.get("/health", summary="健康检查")
