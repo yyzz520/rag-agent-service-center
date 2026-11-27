@@ -63,8 +63,9 @@ async function login() {
   $("userInfo").textContent =
     "已登录 " + data.user.username + " · " + data.user.tenant_id;
   updateRun({
-    user: data.user.username + " · " + data.user.tenant_id +
-      " · " + (data.user.org_id || "无组织") + " L" + (data.user.level || 1),
+    user: data.user.username + " · " +
+      (data.user.role === "admin" ? "管理员" : data.user.role) +
+      " · " + data.user.tenant_id,
   });
 }
 
