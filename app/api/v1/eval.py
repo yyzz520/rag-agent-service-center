@@ -113,7 +113,10 @@ def run_router_now(
 
 @router.get("/experiments", summary="查看单变量 A/B 实验历史（仅管理员）")
 def list_experiments(_: UserContext = Depends(require_permission("eval:read"))):
-    return ok(_history(read_experiments()))
+    runs = read_experiments()
+    result = _history(runs)
+    result["runs"] = runs[-10:]  # 工作台按实验名展示最近一次对比
+    return ok(result)
 
 
 @router.post("/experiments", summary="跑一轮单变量 A/B 实验（仅管理员；部分实验真调 LLM）")

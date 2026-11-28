@@ -77,7 +77,11 @@
 | `refusal_finalize` | 拒答收口 关 vs 开 | 真跑生成 | 有 token |
 | `plan_schema` | 计划提示词是否注入工具 schema | 真跑规划+执行 | 有 token |
 
-本地当前索引上 rerank 实测：MRR 0.366→0.869（Δ+0.503，95% CI [0.445, 0.553]），recall@1 0→0.869，recall@16 0.869→0.869。
+本地当前索引上实测：
+
+- **rerank 关→开**：MRR 0.366→0.869（Δ+0.503，95% CI [0.445, 0.553]），recall@1 0→0.869
+- **拒答收口 关→开**：refusal_rate 0.75→1.0（Δ+0.25），negative_cited_rate 0.25→0（Δ-0.25）
+- **计划 schema 关→开**：success_rate 0.2→1.0（Δ+0.8，95% CI [0.4, 1.0]），平均 token +46（CI [-10, 95]，差异不显著）
 
 口径：
 

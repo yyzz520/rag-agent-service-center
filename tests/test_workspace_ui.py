@@ -24,4 +24,6 @@ def test_workspace_js_renders_user_content_as_text():
     assert "openTrace" in js
     assert "uploadDoc" in js
     assert "renderAB" in js
+    assert "plan-edit" in js
+    assert "保存修改并批准" in js
     assert "innerHTML +=" not in js  # 不往 DOM 里拼 HTML 字符串

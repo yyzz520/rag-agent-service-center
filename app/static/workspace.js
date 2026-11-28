@@ -501,17 +501,42 @@ function renderPlan(d) {
     row.appendChild(main);
     card.appendChild(row);
   });
+  const plan = d.plan || d.steps || [];
+  const hint = document.createElement("p");
+  hint.className = "plan-edit-hint";
+  hint.textContent = "如需修正参数（例如批号写错），编辑下面 JSON 后点「保存修改并批准」。";
+  card.appendChild(hint);
+  const editor = document.createElement("textarea");
+  editor.className = "plan-edit";
+  editor.value = JSON.stringify(plan, null, 2);
+  card.appendChild(editor);
+
   const actions = document.createElement("div");
   actions.className = "actions";
   const approve = document.createElement("button");
   approve.className = "ok";
   approve.textContent = "批准计划";
+  const edit = document.createElement("button");
+  edit.className = "primary";
+  edit.textContent = "保存修改并批准";
   const reject = document.createElement("button");
   reject.className = "danger";
   reject.textContent = "拒绝计划";
-  approve.onclick = () => decidePlan(d, "approve", [approve, reject]);
-  reject.onclick = () => decidePlan(d, "reject", [approve, reject]);
+  approve.onclick = () => decidePlan(d, "approve", [approve, edit, reject]);
+  edit.onclick = () => {
+    let steps;
+    try {
+      steps = JSON.parse(editor.value);
+      if (!Array.isArray(steps) || !steps.length) throw new Error("需要非空数组");
+    } catch (e) {
+      addMsg($("planMessages"), "error", "计划 JSON 无效：" + e.message);
+      return;
+    }
+    decidePlan(d, "edit", [approve, edit, reject], steps);
+  };
+  reject.onclick = () => decidePlan(d, "reject", [approve, edit, reject]);
   actions.appendChild(approve);
+  actions.appendChild(edit);
   actions.appendChild(reject);
   card.appendChild(actions);
   wrap.appendChild(card);
@@ -519,15 +544,14 @@ function renderPlan(d) {
   box.scrollTop = box.scrollHeight;
 }
 
-async function decidePlan(d, decision, buttons) {
+async function decidePlan(d, decision, buttons, steps) {
   buttons.forEach((b) => (b.disabled = true));
   const box = $("planMessages");
   const loading = addMsg(box, "assistant", "执行中…");
   try {
-    const r = await api("/agent/plan/approve", {
-      conversation_id: d.conversation_id,
-      decision,
-    });
+    const body = { conversation_id: d.conversation_id, decision };
+    if (decision === "edit") body.steps = steps;
+    const r = await api("/agent/plan/approve", body);
     loading.remove();
     handlePlan(r);
   } catch (e) {
@@ -593,16 +617,23 @@ async function loadMiniEval() {
   }
 }
 
-function renderAB(exp) {
+function renderAB(exps) {
   const box = $("abPanel");
   box.innerHTML = "";
-  if (!exp) {
+  const runs = (exps && exps.runs) || [];
+  const latest = new Map();
+  runs.forEach((r) => latest.set(r.name, r));
+  if (!latest.size) {
     const p = document.createElement("p");
     p.className = "muted";
     p.textContent = "还没有 A/B 实验。跑：make eval-experiment NAME=rerank（或 refusal_finalize / plan_schema）。";
     box.appendChild(p);
     return;
   }
+  latest.forEach((exp, name) => box.appendChild(renderAbCard(exp)));
+}
+
+function renderAbCard(exp) {
   const card = document.createElement("div");
   card.className = "card ab-card";
   const h = document.createElement("h3");
@@ -645,7 +676,7 @@ function renderAB(exp) {
     table.appendChild(tr);
   });
   card.appendChild(table);
-  box.appendChild(card);
+  return card;
 }
 
 async function loadEval() {
@@ -655,7 +686,7 @@ async function loadEval() {
     const data = await fetchEval();
     const [ret, gen, agent, router, plan, exps] = data;
     updateMini(data);
-    renderAB(exps && exps.latest);
+    renderAB(exps);
     const cards = [
       metricCard("检索（最近）", ret.latest && ret.latest.metrics, [
         ["recall@1", "recall@1"], ["recall@5", "recall@5"],

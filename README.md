@@ -126,7 +126,7 @@ make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
 - **文档入库**：上传 → 解析状态 → 源文件 / 解析文本 / 父块子块三栏对照；回答里的引用可一键跳到链路
 - **知识库问答**：SSE 流式输出，答案带 `[n]` 来源，负样本演示拒答
 - **智能体与审批**：SSE 流式输出、工具事件、外部工具暂停 → 批准/拒绝
-- **计划任务**：生成计划 → 人工批准 → 逐步执行 → 合成
+- **计划任务**：生成计划 → 可改参数后批准 / 拒绝 → 逐步执行 → 合成
 - **评测数据**：读取最近一次检索/生成/Agent/路由/计划评测指标
 
 左侧「本次运行」面板显示路由、工具、审批状态、trace 和耗时；这是质量合规工作台（合成数据环境），`make workspace-reset` 重置仓储假数据。
@@ -157,7 +157,7 @@ make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
 - **Agent**：8 条任务，工具路由 1.0、完成率 1.0、平均 0.88 步、约 3071 token；负样本 3/3 干净拒答，禁工具任务 0 调用。
 - **诊断/门禁**：`GET /eval/diagnosis` 做规则化 badcase 归因（检索/精排/生成/拒答）；`make eval-gate` 指标低于 baseline 阈值直接非 0 退出。每份评测报告都带 `prompt_version` 和 `dataset.sha256`（题集指纹），跨运行对比分数前先核对这两个是否一致；关键指标同时给 95% bootstrap 区间，生成评测可传 `repeat>1` 同题多跑看波动。
 - **运维视图**：`make quality-report` 从 trace 聚合各阶段 p50/p95 耗时与 token 消耗；`/metrics` 给请求级计数/延迟，配合定位瓶颈。
-- **A/B 实验**：`make eval-experiment NAME=rerank`（也支持 `refusal_finalize` / `plan_schema`）。本地当前索引上实测：rerank 关→开，MRR 0.366→0.869（Δ+0.503，95% CI [0.445, 0.553]），recall@1 0→0.869；报告存 `data/eval/experiments.jsonl`，工作台「评测数据」展示对比表。
+- **A/B 实验**：`make eval-experiment NAME=...`，三个变量都跑过：rerank 关→开 MRR 0.366→0.869（Δ+0.503，95% CI [0.445, 0.553]）；拒答收口关→开 refusal_rate 0.75→1.0、negative_cited_rate 0.25→0；计划 schema 关→开 success_rate 0.2→1.0（Δ+0.8，CI [0.4, 1.0]）。报告带配对区间和 `comparable`，工作台「评测数据」展示对比表。
 
 ![RAG 检索 recall@1 对比](docs/images/eval-recall-at-1.svg)
 
