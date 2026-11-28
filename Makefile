@@ -1,7 +1,8 @@
 PYTHON ?= .venv/bin/python
 DAYS ?= 7
+NAME ?= rerank
 
-.PHONY: venv install install-dev test lint verify eval-gate eval-router eval-plan export-finetune quality-report seed seed-eval reindex security run workspace-reset
+.PHONY: venv install install-dev test lint verify eval-gate eval-router eval-plan eval-experiment export-finetune quality-report seed seed-eval reindex security run workspace-reset
 
 .venv:
 	python3 -m venv .venv
@@ -33,6 +34,9 @@ eval-router:
 
 eval-plan:
 	$(PYTHON) scripts/plan_eval.py
+
+eval-experiment:
+	$(PYTHON) scripts/run_experiment.py --name $(NAME)
 
 quality-report:
 	$(PYTHON) scripts/quality_report.py --days $(DAYS)

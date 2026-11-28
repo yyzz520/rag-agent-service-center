@@ -8,6 +8,7 @@ from functools import lru_cache
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.ai.providers import backup_llm, primary_llm
+from app.config import settings
 from app.rag.context import expand_parents
 from app.rag.guard import sanitize_context
 from app.rag.prompts import get_prompt
@@ -98,5 +99,9 @@ def run_rag(
         rec.record(msg)
     text = msg.content if isinstance(msg.content, str) else str(msg.content)
     # 拒答不该带引用：整段拒答时去掉 [n] 并清空 sources，评测与前端都按收口后的结果算。
-    answer, sources = finalize(text, ctx["sources"])
+    # 开关只用于 A/B 实验，生产默认开启。
+    if settings.refusal_finalize_enabled:
+        answer, sources = finalize(text, ctx["sources"])
+    else:
+        answer, sources = text, ctx["sources"]
     return {"answer": answer, "sources": sources}

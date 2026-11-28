@@ -109,6 +109,7 @@ make verify        # ruff + pytest，提交前必跑
 make eval-gate     # 最近一次评测 vs baseline 阈值，低于阈值非 0 退出
 make eval-router   # 路由准确率/混淆矩阵（规则分类，零 LLM 花费）
 make eval-plan     # Plan-and-Execute 窄场景：成功率/步数/token/耗时（真调 LLM，有花费）
+make eval-experiment NAME=rerank  # 单变量 A/B：同一题集只改一个变量，输出差值与配对 CI
 make quality-report # 从 trace 聚合各阶段 p50/p95 耗时与 token 消耗（DAYS=7）
 make seed          # 启动服务后一键上传 samples/medical（已存在跳过）
 make seed-eval     # seed + 跑一次检索评测
@@ -146,6 +147,7 @@ make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
 | Agent 行为 | 8 条固定任务（含负样本/禁工具），**真跑 LLM** | 有花费 | 工具路由正确率 / 完成率 / 步数 / token / 拒答率 / 禁工具调用率 |
 | 意图路由 | 14 条固定问法（含无外部工具回退） | 零 LLM 花费 | 路由准确率 / 各路由 precision·recall / 混淆矩阵 |
 | Plan 执行 | 5 条多步任务（虚构医药+仓储），**真跑规划→执行→合成** | 有花费 | 任务成功率 / 平均步数 / token / 耗时 |
+| 单变量 A/B | 同题集 baseline/variant，只改一个变量 | 视任务 | 指标差值 + 配对 bootstrap 区间 |
 
 同一组题改参数重跑即可逐行对比。实测示例：
 
@@ -155,6 +157,7 @@ make run           # 零依赖本地启动（SQLite + 嵌入式 Chroma）
 - **Agent**：8 条任务，工具路由 1.0、完成率 1.0、平均 0.88 步、约 3071 token；负样本 3/3 干净拒答，禁工具任务 0 调用。
 - **诊断/门禁**：`GET /eval/diagnosis` 做规则化 badcase 归因（检索/精排/生成/拒答）；`make eval-gate` 指标低于 baseline 阈值直接非 0 退出。每份评测报告都带 `prompt_version` 和 `dataset.sha256`（题集指纹），跨运行对比分数前先核对这两个是否一致；关键指标同时给 95% bootstrap 区间，生成评测可传 `repeat>1` 同题多跑看波动。
 - **运维视图**：`make quality-report` 从 trace 聚合各阶段 p50/p95 耗时与 token 消耗；`/metrics` 给请求级计数/延迟，配合定位瓶颈。
+- **A/B 实验**：`make eval-experiment NAME=rerank`（也支持 `refusal_finalize` / `plan_schema`）。本地当前索引上实测：rerank 关→开，MRR 0.366→0.869（Δ+0.503，95% CI [0.445, 0.553]），recall@1 0→0.869；报告存 `data/eval/experiments.jsonl`，工作台「评测数据」展示对比表。
 
 ![RAG 检索 recall@1 对比](docs/images/eval-recall-at-1.svg)
 

@@ -65,6 +65,28 @@
 - 实测：5/5 成功，平均 1.8 步、2877 token、16.1 秒（固定小集，用于回归与选型，不代表开放域成功率）。
 - 评测用 MemorySaver + 独立 thread，自动 approve，不碰线上会话；HITL 审批链路由单元测试覆盖。
 
+## 5. 单变量 A/B 实验
+
+`make eval-experiment NAME=rerank` 对同一题集跑 baseline / variant，**只改一个变量**，输出指标差值与配对 bootstrap 区间。报告存 `data/eval/experiments.jsonl`，工作台「评测数据」直接展示对比表。
+
+可用实验：
+
+| name | 变量 | 任务 | 成本 |
+|---|---|---|---|
+| `rerank` | rerank 关 vs 开 | 检索重放 | 低 |
+| `refusal_finalize` | 拒答收口 关 vs 开 | 真跑生成 | 有 token |
+| `plan_schema` | 计划提示词是否注入工具 schema | 真跑规划+执行 | 有 token |
+
+本地当前索引上 rerank 实测：MRR 0.366→0.869（Δ+0.503，95% CI [0.445, 0.553]），recall@1 0→0.869，recall@16 0.869→0.869。
+
+口径：
+
+- 报告带 `comparable`（题集 sha256 一致才算可比）和 `prompt_version`
+- 配对区间按题目对齐，不是两组独立样本的区间
+- **当前本地索引是部分重建状态**，绝对值和历史报告不可直接比；A/B 只在同一索引快照内可比。全量 `make reindex` 后再跑一轮才是完整基线
+
+API：`POST /api/v1/eval/experiments`（body: `{"name":"rerank"}`）、`GET /api/v1/eval/experiments`。
+
 ## 6. Badcase 诊断
 
 `GET /api/v1/eval/diagnosis` 读最近一次三层评测，按规则归因：
@@ -96,6 +118,8 @@ GET  /api/v1/eval/router
 GET  /api/v1/eval/plan
 GET  /api/v1/eval/summary       # 三层最新指标汇总
 GET  /api/v1/eval/diagnosis     # 最近一次评测的规则化 badcase 归因
+POST /api/v1/eval/experiments   # 单变量 A/B（body: name=rerank/refusal_finalize/plan_schema）
+GET  /api/v1/eval/experiments   # A/B 实验历史
 ```
 
 ## 评测门禁

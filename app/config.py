@@ -107,6 +107,10 @@ class Settings(BaseSettings):
     # 和请求配额互补：配额防"次数"，这里防"单次长会话烧太多"。
     tenant_daily_token_budget: int = 0
 
+    # 实验开关（默认生产行为；A/B 实验临时切换）
+    refusal_finalize_enabled: bool = True
+    agent_plan_include_schema: bool = True
+
     # Plan-and-Execute：计划最多几步（一次计划审批覆盖全部步骤）。
     agent_plan_max_steps: int = 6
 

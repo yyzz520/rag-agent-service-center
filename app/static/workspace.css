@@ -631,3 +631,17 @@ code { background: #eef2ff; padding: 1px 5px; border-radius: 4px; }
   .inspector-grid { grid-template-columns: 1fr; }
   .pane-body, .pdf-frame { height: 240px; }
 }
+
+/* ---------- A/B 实验 ---------- */
+.ab-panel { margin-bottom: 14px; }
+.ab-card { grid-column: 1 / -1; }
+.ab-meta { margin: 0 0 10px; color: var(--muted); font-size: 11px; }
+.ab-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ab-table th, .ab-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.ab-table th { color: var(--muted); font-weight: 600; background: #f8fafc; }
+.ab-table td.up { color: var(--ok); font-weight: 600; }
+.ab-table td.down { color: var(--err); font-weight: 600; }

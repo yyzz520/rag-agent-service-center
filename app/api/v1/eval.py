@@ -19,6 +19,7 @@ from app.db import get_db
 from app.rag.agent_eval import read_agent_reports, run_agent_eval
 from app.rag.diagnosis import run_diagnosis
 from app.rag.eval import read_reports, run_eval
+from app.rag.experiments import EXPERIMENTS, read_experiments, run_experiment
 from app.rag.gen_eval import read_gen_reports, run_gen_eval
 from app.rag.plan_eval import read_plan_reports, run_plan_eval
 from app.rag.router_eval import read_router_reports, run_router_eval
@@ -41,6 +42,11 @@ class GenerationEvalRequest(BaseModel):
 
 class AgentEvalRequest(BaseModel):
     note: str | None = Field(default=None, description="给这次运行打个标签，便于和历史里的其他运行区分")
+
+
+class ExperimentRequest(BaseModel):
+    name: str = Field(description=f"实验名：{', '.join(EXPERIMENTS)}")
+    note: str | None = Field(default=None, description="给这次运行打个标签")
 
 
 class RouterEvalRequest(BaseModel):
@@ -102,6 +108,27 @@ def run_router_now(
     except Exception as e:
         return error(50001, f"路由评测失败：{e}", status=500)
     audit_record(db, user, "eval.router", req.note or "", f"accuracy={report['metrics'].get('accuracy')}")
+    return ok(report)
+
+
+@router.get("/experiments", summary="查看单变量 A/B 实验历史（仅管理员）")
+def list_experiments(_: UserContext = Depends(require_permission("eval:read"))):
+    return ok(_history(read_experiments()))
+
+
+@router.post("/experiments", summary="跑一轮单变量 A/B 实验（仅管理员；部分实验真调 LLM）")
+def run_experiment_now(
+    req: ExperimentRequest,
+    user: UserContext = Depends(require_permission("eval:run")),
+    db: Session = Depends(get_db),
+):
+    try:
+        report = run_experiment(req.name, note=req.note)
+    except ValueError as e:
+        return error(40001, str(e))
+    except Exception as e:
+        return error(50001, f"实验失败：{e}", status=500)
+    audit_record(db, user, "eval.experiment", req.name, f"comparable={report.get('comparable')}")
     return ok(report)
 
 

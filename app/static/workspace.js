@@ -563,6 +563,7 @@ async function fetchEval() {
     apiGet("/eval/agent"),
     apiGet("/eval/router"),
     apiGet("/eval/plan"),
+    apiGet("/eval/experiments"),
   ]);
 }
 
@@ -592,13 +593,69 @@ async function loadMiniEval() {
   }
 }
 
+function renderAB(exp) {
+  const box = $("abPanel");
+  box.innerHTML = "";
+  if (!exp) {
+    const p = document.createElement("p");
+    p.className = "muted";
+    p.textContent = "还没有 A/B 实验。跑：make eval-experiment NAME=rerank（或 refusal_finalize / plan_schema）。";
+    box.appendChild(p);
+    return;
+  }
+  const card = document.createElement("div");
+  card.className = "card ab-card";
+  const h = document.createElement("h3");
+  h.textContent = "单变量实验：" + (exp.title || exp.name);
+  card.appendChild(h);
+  const meta = document.createElement("p");
+  meta.className = "ab-meta";
+  meta.textContent =
+    "task=" + exp.task + " · 可比=" + (exp.comparable ? "是" : "否（题集不一致）") +
+    (exp.cost ? " · " + exp.cost : "");
+  card.appendChild(meta);
+
+  const table = document.createElement("table");
+  table.className = "ab-table";
+  const head = document.createElement("tr");
+  ["指标", "baseline", "variant", "Δ", "Δ 95% CI"].forEach((t) => {
+    const th = document.createElement("th");
+    th.textContent = t;
+    head.appendChild(th);
+  });
+  table.appendChild(head);
+  const comp = exp.comparison || {};
+  Object.keys(comp).forEach((key) => {
+    const row = comp[key];
+    const tr = document.createElement("tr");
+    const cells = [
+      key,
+      row.baseline == null ? "—" : String(row.baseline),
+      row.variant == null ? "—" : String(row.variant),
+      row.delta == null ? "—" : (row.delta > 0 ? "+" : "") + row.delta,
+    ];
+    const ci = row.delta_ci95;
+    cells.push(ci ? "[" + ci.lo + ", " + ci.hi + "] · n=" + ci.pairs : "—");
+    cells.forEach((text, i) => {
+      const td = document.createElement("td");
+      td.textContent = text;
+      if (i === 3 && row.delta) td.className = row.delta > 0 ? "up" : row.delta < 0 ? "down" : "";
+      tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  });
+  card.appendChild(table);
+  box.appendChild(card);
+}
+
 async function loadEval() {
   const box = $("evalCards");
   box.textContent = "加载中…";
   try {
     const data = await fetchEval();
-    const [ret, gen, agent, router, plan] = data;
+    const [ret, gen, agent, router, plan, exps] = data;
     updateMini(data);
+    renderAB(exps && exps.latest);
     const cards = [
       metricCard("检索（最近）", ret.latest && ret.latest.metrics, [
         ["recall@1", "recall@1"], ["recall@5", "recall@5"],

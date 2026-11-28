@@ -38,6 +38,8 @@
 | GET | /api/v1/eval/router | 路由评测历史（准确率/混淆矩阵） |
 | POST | /api/v1/eval/plan | 跑一轮 Plan-and-Execute 评测（**真调 LLM、有花费**；任务集见 `data/eval/plan_tasks.json`） |
 | GET | /api/v1/eval/plan | 计划执行评测历史（成功率/步数/token/耗时） |
+| POST | /api/v1/eval/experiments | 单变量 A/B：同题集 baseline/variant，输出差值+配对 CI。body: `name`（rerank/refusal_finalize/plan_schema）、`note` |
+| GET | /api/v1/eval/experiments | A/B 实验历史 |
 | GET | /api/v1/eval/summary | 三层评测最新指标汇总 |
 | GET | /api/v1/eval/diagnosis | 最近一次评测的规则化 badcase 归因（检索/精排/生成/拒答） |
 | GET | /health | 健康检查：chunks / auth_enabled / api_key_ready |

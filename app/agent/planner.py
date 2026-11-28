@@ -74,7 +74,7 @@ def _tool_spec(name: str, tool) -> str:
         if args_schema is not None and hasattr(args_schema, "model_json_schema"):
             schema = args_schema.model_json_schema()
     spec = f"- {name}: {tool.description}"
-    if schema:
+    if schema and settings.agent_plan_include_schema:
         spec += f"\n  参数 JSON Schema：{json.dumps(schema, ensure_ascii=False)}"
     return spec
 
